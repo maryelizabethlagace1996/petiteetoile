@@ -1,0 +1,1263 @@
+<!DOCTYPE html>
+<html lang="fr-CA">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Petite Étoile — Prototype MVP</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<script>
+  /* =========================================================
+     PALETTE ÉPURÉE — 3 rôles :
+       • fond neutre doux  : creme (#FFF8EE) + blanc + encre (#211C4E)
+       • primaire (marque) : bleu marine du texte (primary = #211C4E)
+       • accent (action / validation / étoiles) : or (accent)
+     ========================================================= */
+  tailwind.config = {
+    theme: { extend: {
+      fontFamily: { display: ['Fredoka', 'sans-serif'], sans: ['Nunito', 'sans-serif'] },
+      colors: {
+        creme: '#FFF8EE', ink: '#211C4E',
+        primary: { 50:'#F0F0F5', 100:'#E1E0EB', 200:'#C4C2D6', 500:'#211C4E', 600:'#211C4E', 700:'#211C4E', 900:'#211C4E' },
+        accent:  { 50:'#FFF8E3', 100:'#FFEDB3', 400:'#FFC93C', 500:'#F2B100', 700:'#7A5600' },
+      }
+    } }
+  }
+</script>
+<style>
+  html, body { height: 100%; overflow: hidden; }   /* aucun défilement de la page principale */
+  body { margin: 0; font-family: 'Nunito', sans-serif; }
+  *, ::before, ::after { box-sizing: border-box; }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { scrollbar-width: none; }
+  /* STAR-28 / STAR-32 : textes enfant (expérience détaillée) ≥ 18 pt, sans empattement, lettres espacées */
+  .kid-txt { font-family: 'Nunito', sans-serif; font-size: 24px; line-height: 1.25; letter-spacing: .03em; font-weight: 800; }
+  @keyframes pop { 0% { transform: scale(.3); opacity: 0 } 60% { transform: scale(1.12); opacity: 1 } 100% { transform: scale(1) } }
+  @keyframes fall { 0% { transform: translateY(-40px) rotate(0); opacity: 1 } 100% { transform: translateY(840px) rotate(480deg); opacity: .2 } }
+  @keyframes twinkle { 0%,100% { opacity: .25 } 50% { opacity: .9 } }
+  @keyframes floaty { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-8px) } }
+  @keyframes shake { 0%,100% { transform: translateX(0) } 20%,60% { transform: translateX(-8px) } 40%,80% { transform: translateX(8px) } }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(10px) } to { opacity: 1; transform: none } }
+  @keyframes blink { 0%,100% { opacity: 1; transform: scale(1) } 50% { opacity: .25; transform: scale(.85) } }
+  @keyframes flyUp { 0%,55% { transform: translate(0,0) scale(1); opacity: 1 } 100% { transform: translate(0,-330px) scale(.2); opacity: .2 } }
+  @keyframes alive { 0%,100% { opacity: 1 } 50% { opacity: .55 } }
+  .pop { animation: pop .5s cubic-bezier(.2,.9,.3,1.3) both; }
+  svg .pop, svg .alive { transform-box: fill-box; transform-origin: center; }
+  .alive { animation: alive 1.6s ease-in-out infinite; }
+  .twinkle { animation: twinkle 3s ease-in-out infinite; }
+  .floaty { animation: floaty 3.2s ease-in-out infinite; }
+  .shake { animation: shake .45s ease; }
+  .fade-up { animation: fadeUp .3s ease both; }
+  .blink { animation: blink 1s ease-in-out infinite; display: inline-block; }
+  .fly-up { animation: flyUp 2.6s ease-in both; }
+  .confetti { position: absolute; top: 0; animation: fall linear forwards; pointer-events: none; }
+  .tap { transition: transform .12s ease; touch-action: manipulation; }
+  .tap:active { transform: scale(.95); }
+  button { touch-action: manipulation; }
+  .field-error { border-color: #E11D48 !important; background: #FFF1F2; }
+</style>
+</head>
+<body class="bg-slate-900 text-ink antialiased">
+
+<div class="h-full flex items-center justify-center gap-10 px-6 py-6">
+
+  <!-- ============ TÉLÉPHONE ============ -->
+  <div id="phoneWrap" class="shrink-0">
+    <div id="phone" class="relative box-content w-[375px] h-[812px] rounded-[40px] border-[7px] border-black ring-1 ring-slate-600 shadow-2xl shadow-black/70 overflow-hidden bg-creme">
+      <div class="absolute top-2 left-1/2 -translate-x-1/2 w-[120px] h-[32px] bg-black rounded-full z-50"></div>
+      <div id="statusbar" class="absolute top-0 inset-x-0 h-12 px-7 flex items-center justify-between text-[15px] font-bold z-40 pointer-events-none text-white">
+        <span>9:41</span>
+        <div class="flex items-center gap-1.5">
+          <i data-lucide="signal" class="w-4 h-4"></i><i data-lucide="wifi" class="w-4 h-4"></i><i data-lucide="battery-full" class="w-6 h-6"></i>
+        </div>
+      </div>
+      <div id="screens"></div>
+      <div id="overlay" class="absolute inset-0 z-[60] hidden"></div>
+      <div id="toast" class="absolute left-5 right-5 bottom-28 z-[70] hidden"></div>
+      <div id="homeIndicator" class="absolute bottom-2 left-1/2 -translate-x-1/2 w-[134px] h-[5px] rounded-full bg-white z-[80] pointer-events-none"></div>
+    </div>
+  </div>
+
+  <!-- ============ PANNEAU PRÉSENTATEUR (hauteur bloquée, sans défilement) ============ -->
+  <aside id="panelWrap" class="shrink-0">
+    <div id="panel" class="w-[540px] rounded-3xl bg-slate-800 border border-slate-700 p-5 text-slate-200 overflow-hidden flex flex-col gap-4">
+      <div class="flex items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-slate-700 flex items-center justify-center text-xl">⭐</div>
+          <div>
+            <p class="text-[10px] uppercase tracking-[.18em] text-slate-400 font-extrabold">Mode présentateur</p>
+            <h2 class="font-display text-lg text-white font-semibold leading-tight">Petite Étoile · MVP</h2>
+          </div>
+        </div>
+        <div class="flex gap-2">
+          <button onclick="reopenApp()" class="tap h-9 px-3 rounded-xl bg-accent-400 hover:bg-accent-500 text-ink text-xs font-extrabold flex items-center gap-1.5" title="Ferme et relance l’app : elle s’ouvre en mode enfant, données conservées">
+            <i data-lucide="smartphone" class="w-3.5 h-3.5"></i> Rouvrir l’app
+          </button>
+          <button onclick="resetDemo()" class="tap h-9 px-3 rounded-xl bg-slate-700 hover:bg-slate-600 text-white text-xs font-extrabold flex items-center gap-1.5" title="Remet la démo à son état initial (écran d’accueil)">
+            <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i> Réinitialiser
+          </button>
+        </div>
+      </div>
+      <div id="lockStatus" class="px-3 py-2 rounded-xl bg-slate-900/70 text-xs font-bold"></div>
+      <div id="panelNav" class="grid grid-cols-2 gap-x-4 gap-y-3"></div>
+      <p id="codeHint" class="text-[11px] text-slate-400 text-center"></p>
+    </div>
+  </aside>
+</div>
+
+<script>
+/* =========================================================
+   CONSTANTES
+   ========================================================= */
+const DAYS = ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
+const DAYS_LONG = ['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche'];
+const DAY_LETTERS = ['L','M','M','J','V','S','D'];
+const MONTHS = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+const ALL_DAYS = [0,1,2,3,4,5,6];
+const WEEKDAYS = [0,1,2,3,4];
+const DEMO_PASSWORD = 'Etoile2026';
+const INACTIVITY_MS = 2 * 60 * 1000;   // STAR-39
+const LOCKOUT_MS = 5 * 60 * 1000;      // STAR-39
+/* Couleur de l'enfant (STAR-18/19) : limitée à l'anneau de l'avatar et à une teinte très légère */
+const COLORS = { corail:'#FF8A7A', ciel:'#4FB6E8', menthe:'#3DBE8B', lavande:'#9B8CF2' };
+const AVATARS = ['🦊','🐻','🐰','🐼','🦁','🐸','🐧','🦄','🐢','🐙','🦉','🐨'];
+const ICONS = ['🪥','🛏️','👕','🥣','🎒','🌙','🛁','📚','🧦','🧸','🍽️','🐶','🪴','🧹','🎹','⚽','🤝','⭐'];
+const MOMENTS = [['matin','☀️','Matin'],['apres','🌤️','Après-midi'],['soir','🌙','Soir']];
+const EXPERIENCES = {
+  simplifiee: { label:'Simplifiée', icon:'🧸', desc:'Pour l’enfant qui ne lit pas encore : seulement sa journée, en images et en icônes, sans texte.' },
+  detaillee:  { label:'Détaillée',  icon:'📖', desc:'Pour l’enfant qui commence à lire : une image et un nom court, et la vue de la semaine.' },
+};
+const REWARDS = [
+  { emoji:'🍿', label:'Soirée cinéma maison' }, { emoji:'🛝', label:'Sortie au parc' },
+  { emoji:'🍕', label:'Choisir le souper' }, { emoji:'🎨', label:'Bricolage en famille' },
+];
+
+/* STAR-22 : bibliothèque illustrée — 30 éléments, 5 catégories, valeur d'étoiles proposée (1 à 3) */
+const CATS = [
+  { id:'matin', icon:'☀️', label:'Matin', type:'task', moment:'matin' },
+  { id:'soir', icon:'🌙', label:'Soir', type:'task', moment:'soir' },
+  { id:'maison', icon:'🏠', label:'Maison', type:'task', moment:'apres' },
+  { id:'savoir', icon:'🤝', label:'Savoir-être', type:'behavior' },
+  { id:'emotions', icon:'💛', label:'Émotions', type:'behavior' },
+];
+const LIB_RAW = [
+  ['matin','🪥','Me brosser les dents',1,1],['matin','👕','M’habiller tout seul',2,1],['matin','🥣','Déjeuner à table',1,1],
+  ['matin','💧','Me laver le visage',1,1],['matin','🛏️','Faire mon lit',1,0],['matin','🎒','Préparer mon sac d’école',2,0],
+  ['soir','🌙','Mettre mon pyjama',1,1],['soir','🪥','Me brosser les dents le soir',1,1],['soir','🛁','Prendre mon bain',1,1],
+  ['soir','📚','Lire 15 minutes',2,0],['soir','🧦','Mettre mon linge au panier',1,0],['soir','👚','Préparer mes vêtements pour demain',2,0],
+  ['maison','🧸','Ranger mes jouets',1,1],['maison','🐶','Nourrir mon animal',1,1],['maison','🪴','Arroser les plantes',1,1],
+  ['maison','🍽️','Mettre la table',2,0],['maison','🧹','Aider à balayer',2,0],['maison','🧺','Plier mes vêtements',3,0],
+  ['savoir','🤝','J’ai partagé',1,1],['savoir','💬','Dire merci et s’il te plaît',1,1],['savoir','⏳','Attendre mon tour',1,1],
+  ['savoir','👂','Écouter du premier coup',1,0],['savoir','🫶','Aider sans qu’on me le demande',2,0],['savoir','🌈','Consoler un ami',2,0],
+  ['emotions','🎈','Je me suis calmé',2,1],['emotions','🤗','Demander un câlin quand je suis triste',1,1],['emotions','🙋','Demander de l’aide',1,1],
+  ['emotions','🗣️','Dire ce que je ressens',1,0],['emotions','😌','Respirer avant de me fâcher',2,0],['emotions','💛','Dire une gentillesse',1,0],
+];
+const LIBRARY = LIB_RAW.map(([cat, emoji, name, stars, simple]) => {
+  const c = CATS.find(x => x.id === cat);
+  return { cat, emoji, name, stars, simple: !!simple, type: c.type, moment: c.moment || null };
+});
+const libByName = n => LIBRARY.find(l => l.name === n);
+
+/* =========================================================
+   DONNÉES DE DÉMO
+   ========================================================= */
+const E = (st, n) => ({ st, n });
+function seed() {
+  return {
+    screen: 'welcome', week: 0, today: 2,
+    currentKid: 'lea', viewDay: 2, weekView: 'day',
+    family: 'Tremblay', parentCode: '4826',
+    unlocked: false, onboarding: false, lastAct: Date.now(),
+    pin: '', pinError: '', pinFails: 0, lockUntil: 0, pinTarget: 'parent', pinTargetOpts: {},
+    codeMode: 'onboard', codeStep: 1, codeFirst: '', codeEntry: '', codeMsg: '',
+    introIdx: 0, giveKid: 'lea', taskFilter: 'all', taskTab: 'task',
+    celebrating: null, justLit: null, accountConsent: false,
+    kids: [
+      { id:'lea', name:'Léa', exp:'detaillee', avatar:'🦊', color:'corail', reward:{ emoji:'🍿', label:'Soirée cinéma maison' }, goalOverride:18, lifetimePast:124, sky:5, rewardWon:false, rewardSeen:false, unseen:[], weekMsg:null },
+      { id:'noah', name:'Noah', exp:'simplifiee', avatar:'🐻', color:'ciel', reward:{ emoji:'🛝', label:'Sortie au parc avec papa' }, goalOverride:null, lifetimePast:58, sky:2, rewardWon:false, rewardSeen:false, unseen:[], weekMsg:null },
+    ],
+    items: [
+      { id:'t1', type:'task', kids:['lea','noah'], name:'Me brosser les dents', emoji:'🪥', moment:'matin', days:ALL_DAYS.slice(), stars:1, active:true },
+      { id:'t2', type:'task', kids:['lea'], name:'Faire mon lit', emoji:'🛏️', moment:'matin', days:WEEKDAYS.slice(), stars:1, active:true },
+      { id:'t7', type:'task', kids:['noah'], name:'M’habiller tout seul', emoji:'👕', moment:'matin', days:WEEKDAYS.slice(), stars:1, active:true },
+      { id:'t3', type:'task', kids:['lea'], name:'Préparer mon sac d’école', emoji:'🎒', moment:'apres', days:WEEKDAYS.slice(), stars:1, active:true },
+      { id:'t6', type:'task', kids:['noah'], name:'Ranger mes jouets', emoji:'🧸', moment:'apres', days:ALL_DAYS.slice(), stars:1, active:true },
+      { id:'t8', type:'task', kids:['lea'], name:'Nourrir Biscuit, notre chien', emoji:'🐶', moment:'apres', days:[5,6], stars:1, active:true },
+      { id:'t4', type:'task', kids:['lea'], name:'Lire 15 minutes', emoji:'📚', moment:'soir', days:[0,2,4], stars:2, active:true },
+      { id:'t5', type:'task', kids:['lea','noah'], name:'Mettre mon pyjama', emoji:'🌙', moment:'soir', days:ALL_DAYS.slice(), stars:1, active:true },
+      { id:'b1', type:'behavior', kids:['lea','noah'], name:'J’ai partagé', emoji:'🤝', stars:1, active:true },
+      { id:'b2', type:'behavior', kids:['lea'], name:'Je me suis calmé', emoji:'🎈', stars:2, active:true },
+      { id:'b3', type:'behavior', kids:['lea'], name:'Aider sans qu’on me le demande', emoji:'🫶', stars:2, active:true },
+      { id:'b4', type:'behavior', kids:['noah'], name:'Dire merci et s’il te plaît', emoji:'💬', stars:1, active:true },
+    ],
+    familyLib: [ { cat:'famille', emoji:'🐶', name:'Nourrir Biscuit, notre chien', stars:1, simple:true, type:'task', moment:'apres' } ],
+    log: {
+      lea:  { 0:{ t1:E('done',1), t2:E('done',1), t3:E('done',1), t4:E('done',2), t5:E('done',1) }, 1:{ t1:E('done',1), t2:E('done',1), t5:E('done',1) }, 2:{ t1:E('done',1), t2:E('pending',1) } },
+      noah: { 0:{ t1:E('done',1), t7:E('done',1), t6:E('done',1) }, 1:{ t1:E('done',1), t5:E('done',1) }, 2:{ t1:E('done',1) } },
+    },
+    bonus: { lea:{ 0:[{ id:'b1', n:1 }] }, noah:{ 1:[{ id:'b4', n:1 }] } },
+    pendingAt: { 'lea-2-t2':'il y a 12 min' },
+    form: null, formErr: {}, draft: null, draftErr: {}, routineKid: null, routineDraft: null, forgotErr: false, accountErr: false,
+  };
+}
+let state = seed();
+
+/* =========================================================
+   HELPERS
+   ========================================================= */
+const $ = id => document.getElementById(id);
+const getKid = id => state.kids.find(k => k.id === id);
+const getItem = id => state.items.find(i => i.id === id);
+const uid = p => p + Math.random().toString(36).slice(2, 8);
+const isSimple = k => k && k.exp === 'simplifiee';
+const dateOf = d => new Date(2026, 8, 28 + 7 * state.week + d);
+const fmtDate = d => { const x = dateOf(d); return (x.getDate() === 1 ? '1er' : x.getDate()) + ' ' + MONTHS[x.getMonth()]; };
+const fullDate = d => DAYS_LONG[d] + ' ' + fmtDate(d);
+
+/* Anti-appuis multiples (STAR-19, 28, 29, 30, 34) */
+const lastTap = {};
+function tapOk(key, ms = 700) { const n = Date.now(); if (lastTap[key] && n - lastTap[key] < ms) return false; lastTap[key] = n; return true; }
+
+/* STAR-27 : une modification s'applique dès le lendemain */
+function itemAt(it, day) { return (it.next && day >= it.nextFrom) ? { ...it, ...it.next } : it; }
+function itemsFor(kid, day, type) {
+  return state.items.filter(i => !i.deleted && i.active && i.type === type).map(i => itemAt(i, day))
+    .filter(i => i.kids.includes(kid) && (type === 'behavior' || i.days.includes(day)));
+}
+function dayLog(kid, day) { state.log[kid] = state.log[kid] || {}; state.log[kid][day] = state.log[kid][day] || {}; return state.log[kid][day]; }
+function dayBonus(kid, day) { state.bonus[kid] = state.bonus[kid] || {}; state.bonus[kid][day] = state.bonus[kid][day] || []; return state.bonus[kid][day]; }
+const entry = (kid, day, id) => ((state.log[kid] || {})[day] || {})[id];
+
+/* Étoiles mémorisées avec leur valeur : supprimer/modifier une tâche ne retire rien (STAR-27) */
+function starsOn(kid, day, st = 'done') {
+  let s = 0; const L = (state.log[kid] || {})[day] || {};
+  for (const id in L) if (L[id].st === st) s += L[id].n;
+  if (st === 'done') ((state.bonus[kid] || {})[day] || []).forEach(b => s += b.n);
+  return s;
+}
+const weekStars = kid => ALL_DAYS.reduce((a, d) => a + starsOn(kid, d), 0);
+const pendingStars = kid => ALL_DAYS.reduce((a, d) => a + starsOn(kid, d, 'pending'), 0);
+const lifetime = k => k.lifetimePast + weekStars(k.id);
+const behaviorCount = (kid, id, day) => (day == null ? ALL_DAYS : [day]).reduce((a, d) => a + ((state.bonus[kid] || {})[d] || []).filter(b => b.id === id).length, 0);
+/* STAR-31 : objectif = 80 % des étoiles possibles, ajustable par le parent */
+function possibleStars(kid) { let s = 0; ALL_DAYS.forEach(d => itemsFor(kid, d, 'task').forEach(i => s += i.stars)); return s; }
+const autoGoal = kid => Math.max(1, Math.round(possibleStars(kid) * 0.8));
+const goalOf = k => k.goalOverride != null ? k.goalOverride : autoGoal(k.id);
+const unseenSum = k => k.unseen.reduce((a, u) => a + u.n, 0);
+
+function checkGoal(kid) {
+  const k = getKid(kid);
+  if (k && !k.rewardWon && weekStars(kid) >= goalOf(k)) { k.rewardWon = true; k.rewardSeen = false; k.sky++; return true; }
+  return false;
+}
+function pendingList() {
+  const out = [];
+  state.kids.forEach(k => ALL_DAYS.forEach(d => { const L = (state.log[k.id] || {})[d] || {}; for (const id in L) if (L[id].st === 'pending' && getItem(id)) out.push({ kid:k.id, day:d, id }); }));
+  return out;
+}
+function namesList(ids) { const n = ids.map(id => getKid(id)?.name).filter(Boolean); return n.length <= 1 ? (n[0] || '') : n.slice(0, -1).join(', ') + ' et ' + n[n.length - 1]; }
+function tooSimple(c) { return /^(\d)\1{3}$/.test(c) || '0123456789'.includes(c) || '9876543210'.includes(c) || ['1212','2580','0852','1122','6969','1010','2020','1004','0007','2468','1357'].includes(c); }
+
+
+/* =========================================================
+   ÉLÉMENTS GRAPHIQUES
+   ========================================================= */
+function starPoints(cx, cy, R, r) {
+  const p = [];
+  for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rad = i % 2 ? r : R; p.push((cx + rad * Math.cos(a)).toFixed(1) + ',' + (cy + rad * Math.sin(a)).toFixed(1)); }
+  return p.join(' ');
+}
+function mascot(size = 120) {
+  return `<svg width="${size}" height="${size}" viewBox="0 0 100 100" aria-hidden="true">
+    <polygon points="${starPoints(50, 52, 48, 22)}" fill="#FFC93C" stroke="#F2B100" stroke-width="3" stroke-linejoin="round"/>
+    <ellipse cx="41" cy="50" rx="3.6" ry="4.6" fill="#1E1A4D"/><ellipse cx="59" cy="50" rx="3.6" ry="4.6" fill="#1E1A4D"/>
+    <path d="M43 60 Q50 67 57 60" stroke="#1E1A4D" stroke-width="3" fill="none" stroke-linecap="round"/></svg>`;
+}
+function starfield(n) {
+  let s = '';
+  for (let i = 0; i < n; i++) { const x = (i * 37 + 11) % 100, y = (i * 53 + 7) % 100, sz = 1 + (i % 2); s += `<span class="absolute rounded-full bg-white twinkle" style="left:${x}%;top:${y}%;width:${sz}px;height:${sz}px;animation-delay:${(i % 7) * .4}s"></span>`; }
+  return `<div class="absolute inset-0 pointer-events-none overflow-hidden">${s}</div>`;
+}
+function avatarBubble(k, size = 'w-10 h-10 text-2xl') {
+  const c = COLORS[k.color];
+  return `<span class="${size} rounded-full inline-flex items-center justify-center shrink-0 bg-white" style="box-shadow:inset 0 0 0 4px ${c}">${k.avatar}</span>`;
+}
+/* STAR-31 : constellation — les nouvelles étoiles s'allument à la fin de la célébration */
+function constellation(k) {
+  const g = goalOf(k), total = weekStars(k.id), hidden = unseenSum(k);
+  const lit = Math.min(Math.max(0, total - hidden), g), pend = pendingStars(k.id), complete = lit >= g;
+  const W = 310, H = 104, R = g > 20 ? 6.5 : g > 12 ? 8 : 10;
+  const pts = Array.from({ length: g }, (_, i) => [g === 1 ? W / 2 : 14 + i * ((W - 28) / (g - 1)), 52 + 30 * Math.sin(i * 1.25) + 8 * Math.cos(i * 2.6)]);
+  const jl = state.justLit && state.justLit.kid === k.id ? state.justLit : null;
+  let lines = '', stars = '';
+  for (let i = 0; i < g - 1; i++) {
+    const on = i + 1 < lit;
+    lines += `<line x1="${pts[i][0]}" y1="${pts[i][1]}" x2="${pts[i + 1][0]}" y2="${pts[i + 1][1]}" stroke="${on ? '#FFC93C' : 'rgba(255,255,255,.16)'}" stroke-width="${on ? 2 : 1.2}" ${on ? '' : 'stroke-dasharray="3 4"'} ${complete ? 'class="alive"' : ''}/>`;
+  }
+  pts.forEach(([x, y], i) => {
+    if (i < lit) {
+      const isNew = jl && i >= jl.from && i < jl.to;
+      stars += `<polygon class="${isNew ? 'pop' : complete ? 'alive' : ''}" style="${isNew ? `animation-delay:${(i - jl.from) * .12}s` : complete ? `animation-delay:${(i % 5) * .2}s` : ''}" points="${starPoints(x, y, R, R * .45)}" fill="#FFC93C"/>`;
+    } else if (i < lit + pend) stars += `<polygon class="blink" points="${starPoints(x, y, R * .9, R * .4)}" fill="none" stroke="#FFC93C" stroke-width="1.5"/>`;
+    else stars += `<circle cx="${x}" cy="${y}" r="2.6" fill="rgba(255,255,255,.35)"/>`;
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" class="w-full h-[104px]" role="img" aria-label="Constellation : ${lit} étoiles sur ${g}">${lines}${stars}</svg>`;
+}
+function toggleSwitch(on, onclick, label = '') {
+  return `<button onclick="${onclick}" class="w-12 h-7 rounded-full p-0.5 transition shrink-0 ${on ? 'bg-primary-500' : 'bg-slate-300'}" role="switch" aria-checked="${on}" aria-label="${label}"><span class="block w-6 h-6 rounded-full bg-white shadow transition ${on ? 'translate-x-5' : ''}"></span></button>`;
+}
+/* Barre d'onglets parent : une action principale par onglet */
+function tabbar(active) {
+  const n = pendingList().length;
+  const t = [['parent','inbox','Demandes'],['give','star','Étoiles'],['tasks','calendar-check','Horaire'],['kids','users','Enfants']];
+  return `<nav class="absolute bottom-0 inset-x-0 bg-white border-t border-slate-100 pt-2.5 pb-7 flex justify-around z-10">
+    ${t.map(([s, ic, l]) => `<button onclick="go('${s}')" class="tap relative w-16 flex flex-col items-center gap-1 ${active === s ? 'text-primary-600' : 'text-slate-400'}">
+      <i data-lucide="${ic}" class="w-6 h-6"></i><span class="text-[11px] font-extrabold">${l}</span>
+      ${s === 'parent' && n ? `<span class="absolute -top-1 right-2 min-w-[18px] h-[18px] px-1 rounded-full bg-accent-400 text-ink text-[10px] font-black flex items-center justify-center">${n}</span>` : ''}</button>`).join('')}
+  </nav>`;
+}
+function backBtn(onclick, dark = false) {
+  return `<button onclick="${onclick}" class="tap w-11 h-11 rounded-full ${dark ? 'bg-white/10 text-white' : 'bg-slate-100 text-ink'} flex items-center justify-center shrink-0" aria-label="Retour"><i data-lucide="chevron-left" class="w-5 h-5"></i></button>`;
+}
+/* En-tête parent : titre clair + bouton retour ou verrouillage */
+function parentHeader(title, sub, back, lock) {
+  return `<div class="px-6 pt-14 pb-5 bg-white flex items-center gap-4">
+    ${back ? backBtn(back) : ''}
+    <div class="flex-1 min-w-0">${sub ? `<p class="text-xs font-bold text-slate-500">${sub}</p>` : ''}
+    <h2 class="font-display text-2xl font-semibold text-ink leading-tight">${title}</h2></div>
+    ${lock ? `<button onclick="go('home')" class="tap w-11 h-11 rounded-full bg-slate-100 text-ink flex items-center justify-center" aria-label="Verrouiller · mode enfant"><i data-lucide="lock" class="w-5 h-5"></i></button>` : ''}</div>`;
+}
+const primaryBtn = (onclick, label, id = '') => `<button ${id ? `id="${id}"` : ''} onclick="${onclick}" class="tap w-full h-14 rounded-2xl bg-primary-600 text-white font-display text-lg font-semibold">${label}</button>`;
+const footer = inner => `<div class="absolute bottom-0 inset-x-0 px-6 pt-4 pb-10 bg-creme border-t border-slate-100">${inner}</div>`;
+const errMsg = (on, msg) => on ? `<p class="mt-2 text-sm font-bold text-rose-600 flex items-center gap-1.5"><i data-lucide="alert-circle" class="w-4 h-4"></i>${msg}</p>` : '';
+const label = (t, req) => `<p class="text-sm font-extrabold text-ink mb-3">${t}${req ? ' <span class="text-rose-600">*</span>' : ''}</p>`;
+const chip = (on, onclick, txt, cls = '') => `<button onclick="${onclick}" class="tap h-11 px-4 rounded-full text-sm font-extrabold ${on ? 'bg-primary-600 text-white' : 'bg-white text-slate-600 border border-slate-200'} ${cls}">${txt}</button>`;
+
+/* =========================================================
+   ÉCRANS
+   ========================================================= */
+const SCREENS = {};
+
+/* ---------- STAR-14 : écran d'accueil ---------- */
+SCREENS.welcome = () => `
+<div class="absolute inset-0 bg-primary-900 overflow-hidden">
+  <img src="https://images.unsplash.com/photo-1419242902214-272b3f66ee7a?auto=format&fit=crop&w=750&q=70" alt="" class="absolute inset-0 w-full h-full object-cover opacity-30" onerror="this.remove()">
+  <div class="relative h-full flex flex-col px-8 pt-24 pb-12 text-white">
+    <div class="flex-1 flex flex-col items-center justify-center text-center">
+      <div class="floaty">${mascot(140)}</div>
+      <h1 class="font-display text-[44px] font-semibold mt-8 leading-none">Petite Étoile</h1>
+      <p class="mt-4 text-primary-100 text-lg leading-snug">Des petites habitudes,<br>de grandes étoiles</p>
+    </div>
+    <button onclick="state.introIdx=0;go('intro')" class="tap w-full h-14 rounded-2xl bg-accent-400 text-ink font-display text-xl font-semibold">Créer un compte</button>
+    <button onclick="go('home');toast('👋 Bon retour, famille Tremblay !')" class="tap mt-4 w-full h-12 text-white/90 font-bold">J’ai déjà un compte</button>
+  </div>
+</div>`;
+
+/* ---------- STAR-14 : présentation (3 écrans max, passable à tout moment) ---------- */
+const INTRO = [
+  { art:'⭐', title:'Une étoile pour chaque effort', text:'Chaque tâche et chaque bon geste allument une étoile dans la constellation de la semaine.' },
+  { art:'🧸', title:'Même sans savoir lire', text:'L’expérience simplifiée n’utilise que des images et des icônes.' },
+  { art:'🔒', title:'Vous gardez le contrôle', text:'Votre enfant demande son étoile. C’est vous qui la donnez, avec votre code parent.' },
+];
+SCREENS.intro = () => {
+  const s = INTRO[state.introIdx], last = state.introIdx === INTRO.length - 1;
+  return `
+  <div class="absolute inset-0 bg-primary-900 text-white overflow-hidden">
+    <div class="relative h-full flex flex-col px-8 pt-14 pb-12">
+      <div class="flex justify-between items-center">
+        ${state.introIdx ? backBtn('state.introIdx--;render()', true) : backBtn("go('welcome')", true)}
+        <button onclick="go('account')" class="h-11 px-5 rounded-full bg-white/10 text-sm font-extrabold">Passer</button>
+      </div>
+      <div class="flex-1 flex flex-col items-center justify-center text-center fade-up" id="introSwipe">
+        <div class="w-44 h-44 rounded-full bg-white/10 flex items-center justify-center text-[88px]">${s.art}</div>
+        <h2 class="font-display text-3xl mt-10 leading-tight">${s.title}</h2>
+        <p class="text-primary-100 text-lg mt-4 leading-relaxed">${s.text}</p>
+      </div>
+      <div class="flex justify-center gap-2 mb-8" aria-label="Écran ${state.introIdx + 1} sur ${INTRO.length}">${INTRO.map((_, i) => `<span class="h-2.5 rounded-full ${i === state.introIdx ? 'w-8 bg-accent-400' : 'w-2.5 bg-white/30'}"></span>`).join('')}</div>
+      <button onclick="${last ? "go('account')" : 'state.introIdx++;render()'}" class="tap w-full h-14 rounded-2xl bg-accent-400 text-ink font-display text-xl font-semibold">${last ? 'Créer un compte' : 'Suivant'}</button>
+      <p class="sr-only">Écran ${state.introIdx + 1} sur ${INTRO.length}</p>
+    </div>
+  </div>`;
+};
+
+/* ---------- Compte parent (consentement) ---------- */
+SCREENS.account = () => `
+  <div class="absolute inset-0 bg-creme flex flex-col">
+    ${parentHeader('Votre compte', 'Étape 1 sur 3', "go('welcome')")}
+    <div class="scroll flex-1 overflow-y-auto no-scrollbar px-6 pt-6 pb-36 space-y-6">
+      <div><label class="block text-sm font-extrabold mb-3" for="aMail">Courriel</label>
+        <input id="aMail" type="email" value="famille.tremblay@courriel.ca" class="w-full h-14 px-4 rounded-2xl bg-white border-2 border-slate-200 font-bold outline-none focus:border-primary-500"></div>
+      <div><label class="block text-sm font-extrabold mb-3" for="aPwd">Mot de passe</label>
+        <input id="aPwd" type="password" value="${DEMO_PASSWORD}" class="w-full h-14 px-4 rounded-2xl bg-white border-2 border-slate-200 font-bold outline-none focus:border-primary-500"></div>
+      <label class="flex gap-4 items-start bg-white rounded-2xl p-5 border-2 ${state.accountErr ? 'field-error' : 'border-slate-100'} cursor-pointer">
+        <input id="aConsent" type="checkbox" class="mt-0.5 w-6 h-6 accent-primary-600 shrink-0" ${state.accountConsent ? 'checked' : ''} onchange="state.accountConsent=this.checked;state.accountErr=false;render()">
+        <span class="text-sm text-slate-700 font-semibold leading-relaxed">Je suis le parent ou le tuteur légal et je consens à la collecte des données nécessaires (Loi 25, LPRPDE).</span>
+      </label>
+      ${errMsg(state.accountErr, 'Le consentement parental est requis.')}
+    </div>
+    ${footer(primaryBtn('createAccount()', 'Continuer'))}
+  </div>`;
+function createAccount() {
+  if (!state.accountConsent) { state.accountErr = true; render(); return; }
+  state.onboarding = true; state.codeMode = 'onboard'; state.codeStep = 1; state.codeEntry = ''; state.codeFirst = ''; state.codeMsg = '';
+  go('setcode');
+}
+
+/* ---------- Pavé numérique partagé ---------- */
+function keypad(fn) {
+  const keys = ['1','2','3','4','5','6','7','8','9','','0','del'];
+  return `<div class="grid grid-cols-3 gap-x-8 gap-y-4">${keys.map(n => n === '' ? '<span></span>' : n === 'del'
+    ? `<button onclick="${fn}('del')" class="tap w-[72px] h-[72px] rounded-full flex items-center justify-center text-primary-100" aria-label="Effacer"><i data-lucide="delete" class="w-7 h-7"></i></button>`
+    : `<button onclick="${fn}('${n}')" class="tap w-[72px] h-[72px] rounded-full bg-white/10 font-display text-3xl">${n}</button>`).join('')}</div>`;
+}
+const pinDots = (len, err) => `<div class="flex gap-5 ${err ? 'shake' : ''}">${[0,1,2,3].map(i => `<span class="w-4 h-4 rounded-full ${i < len ? 'bg-accent-400' : 'border-2 border-primary-200'}"></span>`).join('')}</div>`;
+
+/* ---------- STAR-38 : définir le code parent ---------- */
+SCREENS.setcode = () => {
+  const reset = state.codeMode === 'reset';
+  return `
+  <div class="absolute inset-0 bg-primary-900 text-white">
+    <div class="h-full flex flex-col items-center px-8 pt-14 pb-12">
+      <div class="self-start">${backBtn(reset ? "go('pin')" : "go('account')", true)}</div>
+      <p class="mt-4 text-xs font-bold text-primary-200">${reset ? 'Nouveau code parent' : 'Étape 2 sur 3'}</p>
+      <h2 class="font-display text-2xl mt-2 text-center">${state.codeStep === 1 ? 'Choisissez un code à 4 chiffres' : 'Confirmez votre code'}</h2>
+      <div class="mt-8">${pinDots(state.codeEntry.length, state.codeMsg)}</div>
+      <p class="min-h-[44px] mt-4 text-sm font-bold text-rose-300 text-center leading-snug">${state.codeMsg}</p>
+      <div class="mt-auto">${keypad('codePress')}</div>
+    </div>
+  </div>`;
+};
+function codePress(n) {
+  if (n === 'del') { state.codeEntry = state.codeEntry.slice(0, -1); render(); return; }
+  if (state.codeEntry.length >= 4) return;
+  state.codeEntry += n; state.codeMsg = ''; render();
+  if (state.codeEntry.length < 4) return;
+  setTimeout(() => {
+    const c = state.codeEntry; state.codeEntry = '';
+    if (state.codeStep === 1) {
+      if (tooSimple(c)) { state.codeMsg = 'Ce code est trop facile à deviner (comme 0000 ou 1234). Choisissez-en un autre.'; render(); return; }
+      state.codeFirst = c; state.codeStep = 2; render(); return;
+    }
+    if (c !== state.codeFirst) { state.codeStep = 1; state.codeFirst = ''; state.codeMsg = 'Les deux codes ne correspondent pas. On recommence !'; render(); return; }
+    state.parentCode = c; state.codeStep = 1; state.codeFirst = '';
+    if (state.codeMode === 'reset') { state.unlocked = true; state.pinFails = 0; state.lockUntil = 0; state.lastAct = Date.now(); go('parent'); toast('🔐 Nouveau code enregistré'); }
+    else { go('create'); toast('🔐 Code parent enregistré'); }
+  }, 200);
+}
+
+/* ---------- STAR-38 : code oublié → mot de passe du compte ---------- */
+SCREENS.forgot = () => `
+  <div class="absolute inset-0 bg-primary-900 text-white">
+    <div class="h-full flex flex-col px-8 pt-14 pb-12">
+      <div>${backBtn("go('pin')", true)}</div>
+      <h2 class="font-display text-3xl mt-10">Code oublié ?</h2>
+      <p class="text-primary-100 mt-3 leading-relaxed">Entrez le mot de passe de votre compte pour choisir un nouveau code.</p>
+      <label for="fPwd" class="text-sm font-bold mt-10 mb-3">Mot de passe</label>
+      <input id="fPwd" type="password" placeholder="••••••••" class="w-full h-14 px-4 rounded-2xl bg-white/10 border-2 ${state.forgotErr ? 'border-rose-400' : 'border-white/15'} text-white font-bold outline-none focus:border-accent-400">
+      ${state.forgotErr ? '<p class="mt-3 text-sm font-bold text-rose-300">Mot de passe incorrect.</p>' : ''}
+      <button onclick="checkForgot()" class="tap mt-auto w-full h-14 rounded-2xl bg-accent-400 text-ink font-display text-lg font-semibold">Continuer</button>
+    </div>
+  </div>`;
+function checkForgot() {
+  if ($('fPwd').value !== DEMO_PASSWORD) { state.forgotErr = true; render(); return; }
+  state.forgotErr = false; state.codeMode = 'reset'; state.codeStep = 1; state.codeEntry = ''; state.codeMsg = ''; go('setcode');
+}
+
+/* ---------- STAR-19 : sélecteur d'enfant (une seule action : toucher son avatar) ---------- */
+SCREENS.home = () => `
+  <div class="absolute inset-0 bg-creme flex flex-col">
+    <div class="scroll flex-1 overflow-y-auto no-scrollbar px-6 pt-20 pb-36">
+      <h1 class="font-display text-[32px] font-semibold text-ink leading-tight text-center">Qui brille<br>aujourd’hui ?</h1>
+      <div class="grid grid-cols-2 gap-6 mt-12">
+        ${state.kids.map(k => `
+        <button onclick="selectKid('${k.id}')" aria-label="${k.name}" class="tap bg-white rounded-[32px] py-7 flex flex-col items-center gap-4 ${state.highlightKid === k.id ? 'pop' : ''}">
+          <span class="w-20 h-20 rounded-full flex items-center justify-center text-[52px]" style="box-shadow:inset 0 0 0 5px ${COLORS[k.color]};background:${COLORS[k.color]}1a">${k.avatar}</span>
+          <span class="font-display text-xl font-semibold text-ink">${k.name}</span>
+        </button>`).join('')}
+      </div>
+    </div>
+    <div class="absolute bottom-10 inset-x-0 flex justify-center">
+      <button onclick="go('parent')" class="tap h-12 px-5 rounded-full bg-white text-slate-600 text-sm font-extrabold flex items-center gap-2"><i data-lucide="lock" class="w-4 h-4"></i>Espace parent</button>
+    </div>
+  </div>`;
+function selectKid(id) { if (!tapOk('kid', 900) || state.screen !== 'home') return; go('week', { kid:id }); }
+
+/* ---------- STAR-18 : créer un profil enfant (assistant en 3 petites étapes) ---------- */
+function newDraft() { return { name:'', exp:null, avatar:'🐰', color:'menthe', reward:-1, step:1 }; }
+SCREENS.create = () => {
+  const d = state.draft, c = COLORS[d.color], er = state.draftErr || {};
+  const steps = ['Qui est-ce ?', 'Quelle expérience ?', 'Une récompense ?'];
+  const back = d.step > 1 ? 'state.draft.step--;render()' : (state.onboarding ? "go('setcode')" : "go('kids')");
+  let body = '';
+  if (d.step === 1) body = `
+      <div class="flex flex-col items-center">
+        <div class="w-28 h-28 rounded-full flex items-center justify-center text-7xl bg-white" style="box-shadow:inset 0 0 0 6px ${c}">${d.avatar}</div>
+      </div>
+      <div>
+        <label for="dName" class="block text-sm font-extrabold mb-3">Prénom ou surnom <span class="text-rose-600">*</span></label>
+        <input id="dName" value="${d.name.replace(/"/g, '&quot;')}" maxlength="16" placeholder="Ex. : Flo"
+          oninput="state.draft.name=this.value;if(this.value.trim())this.classList.remove('field-error')"
+          class="w-full h-14 px-4 rounded-2xl bg-white border-2 border-slate-200 focus:border-primary-500 outline-none font-bold text-lg ${er.name ? 'field-error' : ''}">
+        ${errMsg(er.name, 'Le prénom ou le surnom est requis.')}
+      </div>
+      <div>${label('Avatar')}
+        <div class="grid grid-cols-6 gap-3">${AVATARS.map(a => `<button onclick="setDraft('avatar','${a}')" class="tap aspect-square rounded-2xl text-2xl flex items-center justify-center ${a === d.avatar ? 'bg-primary-100 ring-2 ring-primary-500' : 'bg-white'}">${a}</button>`).join('')}</div>
+      </div>
+      <div>${label('Couleur')}
+        <div class="flex gap-5">${Object.entries(COLORS).map(([n, v]) => `<button onclick="setDraft('color','${n}')" class="tap w-11 h-11 rounded-full ${n === d.color ? 'ring-4 ring-offset-2 ring-primary-200' : ''}" style="background:${v}" aria-label="${n}"></button>`).join('')}</div>
+      </div>
+      <p class="text-xs text-slate-500 font-semibold flex gap-2"><i data-lucide="shield-check" class="w-4 h-4 shrink-0"></i>Nous ne demandons ni photo, ni âge, ni date de naissance, ni aucune autre donnée personnelle.</p>`;
+  if (d.step === 2) body = `
+      <p class="text-slate-600 leading-relaxed">Choisissez selon ce que votre enfant sait faire, pas selon son âge.</p>
+      <div class="space-y-4 ${er.exp ? 'p-1.5 rounded-3xl ring-2 ring-rose-500' : ''}">
+        ${['simplifiee','detaillee'].map(key => { const x = EXPERIENCES[key], on = d.exp === key;
+          const preview = key === 'simplifiee'
+            ? `<div class="flex gap-2 mt-4">${['🪥','👕','🌙'].map(e => `<span class="w-12 h-12 rounded-xl bg-creme flex items-center justify-center text-2xl">${e}</span>`).join('')}</div>`
+            : `<div class="mt-4 flex items-center gap-3 bg-creme rounded-xl px-3 py-2.5"><span class="text-2xl">🪥</span><span class="font-extrabold text-ink">Me brosser les dents</span></div>`;
+          return `<button onclick="setDraft('exp','${key}')" class="tap w-full text-left rounded-3xl p-5 border-2 ${on ? 'border-primary-500 bg-primary-50' : 'border-transparent bg-white'}">
+            <div class="flex items-center justify-between"><span class="font-display text-xl text-ink">${x.icon} ${x.label}</span>${on ? '<i data-lucide="check-circle-2" class="w-6 h-6 text-primary-600"></i>' : ''}</div>
+            <p class="text-sm text-slate-600 leading-relaxed mt-2">${x.desc}</p>${preview}</button>`; }).join('')}
+      </div>
+      ${errMsg(er.exp, 'Choisissez une expérience.')}`;
+  if (d.step === 3) body = `
+      <p class="text-slate-600 leading-relaxed">Facultatif : elle s’affiche à côté de la constellation de la semaine.</p>
+      <div class="grid grid-cols-2 gap-4">
+        ${REWARDS.map((r, i) => `<button onclick="setDraft('reward',${i})" class="tap rounded-3xl p-5 flex flex-col items-center gap-3 text-center ${i === d.reward ? 'bg-primary-50 ring-2 ring-primary-500' : 'bg-white'}"><span class="text-5xl">${r.emoji}</span><span class="text-sm font-extrabold text-ink leading-tight">${r.label}</span></button>`).join('')}
+      </div>
+      <button onclick="setDraft('reward',-1)" class="tap w-full h-12 rounded-2xl font-extrabold ${d.reward === -1 ? 'bg-primary-50 text-primary-700 ring-2 ring-primary-500' : 'bg-white text-slate-600'}">Plus tard</button>`;
+  return `
+  <div class="absolute inset-0 bg-creme flex flex-col">
+    ${parentHeader(steps[d.step - 1], `Nouveau profil · ${d.step} sur 3`, back)}
+    <div class="scroll flex-1 overflow-y-auto no-scrollbar px-6 pt-6 pb-36 space-y-8">${body}</div>
+    ${footer(d.step < 3 ? primaryBtn('draftNext()', 'Continuer') : primaryBtn('saveProfile()', 'Créer le profil'))}
+  </div>`;
+};
+function setDraft(k, v) { state.draft[k] = v; if (k === 'exp') state.draftErr.exp = false; render(); }
+function draftNext() {
+  const d = state.draft;
+  if (d.step === 1 && !d.name.trim()) { state.draftErr.name = true; render(); return; }
+  if (d.step === 2 && !d.exp) { state.draftErr.exp = true; render(); return; }
+  state.draftErr = {}; d.step++; render(true);
+}
+function saveProfile() {
+  const d = state.draft, name = d.name.trim();
+  state.draftErr = { name: !name, exp: !d.exp };
+  if (state.draftErr.name || state.draftErr.exp) { d.step = state.draftErr.name ? 1 : 2; render(true); toast('✏️ Complétez le champ signalé'); return; }
+  const id = uid('k');
+  state.kids.push({ id, name, exp:d.exp, avatar:d.avatar, color:d.color, reward: d.reward >= 0 ? { ...REWARDS[d.reward] } : null, goalOverride:null, lifetimePast:0, sky:0, rewardWon:false, rewardSeen:false, unseen:[], weekMsg:'first' });
+  state.routineKid = id; state.routineDraft = routineFor(d.exp);
+  go('routine');
+  toast(`🌌 ${name} démarre avec 0 étoile et une première galaxie à découvrir`);
+}
+
+/* ---------- STAR-23 : routine type matin + soir ---------- */
+function routineFor(exp) {
+  const names = exp === 'simplifiee'
+    ? ['Me brosser les dents','M’habiller tout seul','Déjeuner à table','Mettre mon pyjama','Me brosser les dents le soir']
+    : ['Faire mon lit','Me brosser les dents','Préparer mon sac d’école','Lire 15 minutes','Mettre mon pyjama','Me brosser les dents le soir'];
+  return names.map(n => ({ ...libByName(n), on:true }));
+}
+SCREENS.routine = () => {
+  const k = getKid(state.routineKid); if (!k || !state.routineDraft) return SCREENS.parent();
+  const r = state.routineDraft, n = r.filter(x => x.on).length;
+  const row = (x, i) => `
+    <div class="bg-white rounded-2xl p-4 flex items-center gap-4 ${x.on ? '' : 'opacity-50'}">
+      <span class="text-3xl w-10 text-center">${x.emoji}</span>
+      <div class="flex-1 min-w-0"><p class="font-extrabold text-ink leading-tight">${x.name}</p>
+        <button onclick="routineStars(${i})" class="mt-1.5 text-sm font-extrabold text-accent-700">${'⭐'.repeat(x.stars)} <span class="underline">modifier</span></button></div>
+      ${toggleSwitch(x.on, `state.routineDraft[${i}].on=!state.routineDraft[${i}].on;render()`, x.name)}
+    </div>`;
+  return `
+  <div class="absolute inset-0 bg-creme flex flex-col">
+    ${parentHeader(`La routine de ${k.name}`, 'Proposée pour démarrer')}
+    <div class="scroll flex-1 overflow-y-auto no-scrollbar px-6 pt-6 pb-48 space-y-8">
+      <p class="text-slate-600 leading-relaxed">Planifiée tous les jours, visible tout de suite dans « Ma semaine ». Ajustez-la si besoin.</p>
+      ${MOMENTS.filter(m => m[0] !== 'apres').map(([m, e, l]) => `<div><p class="text-sm font-extrabold text-slate-500 mb-3">${e} ${l}</p><div class="space-y-3">${r.map((x, i) => x.moment === m ? row(x, i) : '').join('')}</div></div>`).join('')}
+    </div>
+    ${footer(`${primaryBtn('acceptRoutine()', `Accepter (${n} tâche${n > 1 ? 's' : ''})`)}<button onclick="skipRoutine()" class="w-full h-12 mt-2 text-sm font-extrabold text-slate-500">Passer sans rien planifier</button>`)}
+  </div>`;
+};
+function routineStars(i) { const x = state.routineDraft[i]; x.stars = x.stars % 3 + 1; render(); }
+function acceptRoutine() {
+  const k = getKid(state.routineKid), sel = state.routineDraft.filter(x => x.on);
+  if (!sel.length) { toast('Sélectionnez au moins une tâche, ou passez.'); return; }
+  sel.forEach(x => state.items.push({ id:uid('t'), type:'task', kids:[k.id], name:x.name, emoji:x.emoji, moment:x.moment, days:ALL_DAYS.slice(), stars:x.stars, active:true }));
+  state.routineDraft = null;
+  go('week', { kid:k.id });
+  toast(`✨ Routine planifiée pour ${k.name}`);
+}
+function skipRoutine() {
+  const ob = state.onboarding; state.routineDraft = null;
+  if (ob) { go('home'); toast('Vous pourrez planifier des tâches depuis l’espace parent.'); }
+  else go('kids');
+}
+
+/* ---------- STAR-28 → 32, 36 : MA SEMAINE (enfant) ---------- */
+function rewardBlock(k, simple) {
+  if (!k.reward) return ''; // STAR-36 : aucune récompense → pas d'emplacement
+  const g = goalOf(k), lit = Math.min(Math.max(0, weekStars(k.id) - unseenSum(k)), g), left = g - lit;
+  if (simple) return `
+    <div class="flex items-center gap-4 mt-4" aria-label="Récompense : ${k.reward.label}">
+      <span class="w-16 h-16 rounded-2xl bg-white/10 flex items-center justify-center text-4xl shrink-0">${k.reward.emoji}</span>
+      <div class="flex flex-wrap gap-1">${left ? Array.from({ length: left }, () => '<span class="text-white/40 text-lg leading-none">☆</span>').join('') : '<span class="text-4xl">🎉</span>'}</div>
+    </div>`;
+  return `
+    <div class="flex items-center gap-4 mt-4">
+      <span class="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center text-3xl shrink-0">${k.reward.emoji}</span>
+      <p class="kid-txt flex-1 min-w-0">${left ? `Encore <span class="text-accent-400">${left} ⭐</span>` : '<span class="text-accent-400">Gagnée ! 🎉</span>'}</p>
+    </div>`;
+}
+/* États distinguables sans lire : rond (à faire) · étoile qui clignote (en attente) · carré or plein (fait) */
+function stateBtn(k, it, day, simple) {
+  const st = entry(k.id, day, it.id)?.st, sz = simple ? 'w-[76px] h-[76px]' : 'w-[72px] h-[72px]';
+  if (st === 'done') return `<div class="${sz} rounded-2xl bg-accent-400 flex items-center justify-center shrink-0" role="img" aria-label="Fait"><span class="text-4xl">⭐</span></div>`;
+  if (st === 'pending') return `<div class="${sz} rounded-2xl border-4 border-accent-400 bg-white flex items-center justify-center shrink-0" role="img" aria-label="En attente"><span class="text-4xl blink">⭐</span></div>`;
+  if (day > state.today) return `<div class="${sz} rounded-full bg-slate-100 flex items-center justify-center shrink-0 text-slate-400" role="img" aria-label="Plus tard"><i data-lucide="hourglass" class="w-8 h-8"></i></div>`;
+  if (day < state.today) return `<div class="${sz} rounded-full border-4 border-dashed border-slate-200 shrink-0" role="img" aria-label="Pas cette fois"></div>`;
+  return `<button onclick="finish('${it.id}')" class="tap ${sz} rounded-full bg-primary-500 text-white flex items-center justify-center shrink-0" aria-label="J’ai fini !"><i data-lucide="check" class="w-10 h-10" stroke-width="3.5"></i></button>`;
+}
+SCREENS.week = () => {
+  const k = getKid(state.currentKid); if (!k) return '';
+  const simple = isSimple(k);
+  if (simple) state.viewDay = state.today;            // simplifiée : uniquement « Ma journée »
+  const day = state.viewDay, g = goalOf(k);
+  const total = weekStars(k.id), shown = Math.min(Math.max(0, total - unseenSum(k)), g), complete = shown >= g;
+  const tasks = itemsFor(k.id, day, 'task'), behaviors = itemsFor(k.id, day, 'behavior');
+  const tint = COLORS[k.color] + '1a';
+  const dayStars = starsOn(k.id, day) - (day === state.today ? Math.min(unseenSum(k), starsOn(k.id, day)) : 0);
+  const done = tasks.filter(t => entry(k.id, day, t.id)?.st === 'done').length;
+
+  /* En-tête : accueil, avatar, (nom) — puis constellation + récompense */
+  const header = `
+    <div class="relative px-6 pt-16 pb-10 text-white overflow-hidden">${starfield(10)}
+      <div class="relative flex items-center gap-4">
+        <button onclick="go('home')" class="tap ${simple ? 'w-[72px] h-[72px]' : 'w-[60px] h-[60px]'} rounded-full bg-white/10 flex items-center justify-center shrink-0" aria-label="Accueil"><i data-lucide="house" class="w-7 h-7"></i></button>
+        ${avatarBubble(k, simple ? 'w-[72px] h-[72px] text-5xl' : 'w-[60px] h-[60px] text-4xl')}
+        ${simple ? '' : `<p class="flex-1 font-display text-[28px] leading-none">${k.name}</p>`}
+      </div>
+      <div class="relative mt-8">${constellation(k)}</div>
+      ${complete
+        ? `<p class="relative mt-4 ${simple ? 'text-4xl text-center' : 'kid-txt text-accent-400 text-center'}">${simple ? '🌌' : '✨ Constellation complète !'}</p>`
+        : rewardBlock(k, simple)}
+    </div>`;
+
+  /* Carte de tâche : image + nom (détaillée) ou image seule (simplifiée), et l'état */
+  const taskCard = it => simple
+    ? `<div class="bg-white rounded-[28px] p-4 flex flex-col items-center gap-4">
+        <div class="w-full h-[92px] rounded-2xl text-6xl flex items-center justify-center" style="background:${tint}" role="img" aria-label="${it.name}">${it.emoji}</div>
+        ${stateBtn(k, it, day, true)}</div>`
+    : `<div class="bg-white rounded-3xl p-4 flex items-center gap-4">
+        <span class="w-16 h-16 rounded-2xl flex items-center justify-center text-4xl shrink-0" style="background:${tint}" aria-hidden="true">${it.emoji}</span>
+        <p class="kid-txt text-ink flex-1 min-w-0">${it.name}</p>
+        ${stateBtn(k, it, day, false)}</div>`;
+  const groups = MOMENTS.map(([m, e, l]) => {
+    const list = tasks.filter(t => t.moment === m); if (!list.length) return '';
+    return simple
+      ? `<section aria-label="${l}"><div class="text-5xl text-center mb-5">${e}</div><div class="grid grid-cols-2 gap-5">${list.map(taskCard).join('')}</div></section>`
+      : `<section><p class="kid-txt text-slate-400 mb-4">${e} ${l}</p><div class="space-y-4">${list.map(taskCard).join('')}</div></section>`;
+  }).join('');
+  const emptyDay = simple
+    ? `<div class="text-center py-12" aria-label="Pas de tâche : fais un bon geste"><div class="text-8xl">🌈</div><div class="text-6xl mt-6">🤝</div></div>`
+    : `<div class="text-center py-12"><div class="text-8xl">🌈</div><p class="kid-txt text-ink mt-8">Pas de tâche aujourd’hui !</p><p class="kid-txt text-slate-500 mt-2">Fais un bon geste 💛</p></div>`;
+
+  /* STAR-26 : « Mes bons gestes » — une rangée d'images, le compteur seulement s'il y en a */
+  const gestes = behaviors.length ? `
+    <section aria-label="Mes bons gestes">
+      ${simple ? '<div class="text-5xl text-center mb-5">💛</div>' : '<p class="kid-txt text-slate-400 mb-4">💛 Mes bons gestes</p>'}
+      <div class="flex flex-wrap gap-4 ${simple ? 'justify-center' : ''}">${behaviors.map(b => { const n = behaviorCount(k.id, b.id); return `
+        <div class="w-[76px] h-[76px] rounded-2xl bg-white flex flex-col items-center justify-center gap-1" role="img" aria-label="${b.name}${n ? ', ' + n + ' étoile(s)' : ''}">
+          <span class="text-4xl leading-none">${b.emoji}</span>${n ? `<span class="text-xs font-black text-accent-700">⭐${n > 1 ? '×' + n : ''}</span>` : ''}</div>`; }).join('')}</div>
+    </section>` : '';
+
+  /* STAR-32 (détaillée) : la semaine en 7 lignes simples, jour courant mis en évidence */
+  const weekOverview = () => ALL_DAYS.map(i => {
+    const list = itemsFor(k.id, i, 'task'), d = list.filter(t => entry(k.id, i, t.id)?.st === 'done').length, today = i === state.today, s = starsOn(k.id, i);
+    return `<button onclick="state.viewDay=${i};state.weekView='day';render()" class="tap w-full h-[72px] px-5 bg-white rounded-3xl flex items-center gap-4 ${today ? 'ring-4 ring-accent-400' : ''}">
+      <span class="kid-txt text-ink flex-1 text-left">${DAYS_LONG[i]}</span>
+      <span class="kid-txt text-slate-500">${list.length ? d + '/' + list.length : '🌈'}</span>
+      <span class="kid-txt text-accent-700 w-16 text-right">${s ? '⭐' + s : ''}</span>
+    </button>`;
+  }).join('');
+
+  const toggleView = simple ? '' : `
+    <div class="grid grid-cols-2 gap-3 p-1.5 rounded-2xl bg-slate-200/60">
+      <button onclick="state.viewDay=state.today;state.weekView='day';render()" class="h-[60px] rounded-xl kid-txt ${state.weekView === 'day' ? 'bg-white text-ink' : 'text-slate-500'}">Ma journée</button>
+      <button onclick="state.weekView='week';render()" class="h-[60px] rounded-xl kid-txt ${state.weekView === 'week' ? 'bg-white text-ink' : 'text-slate-500'}">Ma semaine</button>
+    </div>`;
+  /* Résumé du jour : l'essentiel (étoiles du jour + tâches faites) */
+  const summary = simple ? '' : `<div class="space-y-4">
+    <div class="flex items-end justify-between">
+      <h3 class="kid-txt text-ink">${day === state.today ? 'Aujourd’hui' : DAYS_LONG[day]}</h3>
+      <p class="kid-txt text-accent-700">⭐ ${dayStars}</p>
+    </div>
+    ${tasks.length ? `<div class="h-3 rounded-full bg-slate-200 overflow-hidden"><div class="h-full rounded-full bg-accent-400" style="width:${Math.round(done / tasks.length * 100)}%"></div></div>` : ''}</div>`;
+  const showWeek = !simple && state.weekView === 'week';
+  return `
+  <div class="absolute inset-0 bg-primary-900">
+    <div class="scroll absolute inset-0 overflow-y-auto no-scrollbar">
+      ${header}
+      <div id="daySwipe" class="relative bg-creme rounded-t-[36px] px-6 pt-8 pb-24 min-h-[480px] space-y-10">
+        ${toggleView}
+        ${showWeek ? `<div class="space-y-4">${weekOverview()}</div>` : `${summary}${groups || emptyDay}${gestes}`}
+      </div>
+    </div>
+  </div>`;
+};
+function setDay(i) { if (i < 0 || i > 6) return; state.viewDay = i; render(); }
+
+/* STAR-29 : « J'ai fini ! » → en attente, jamais d'auto-attribution */
+function finish(itemId) {
+  const kid = state.currentKid, it = getItem(itemId);
+  if (!it || state.viewDay !== state.today || !tapOk('finish' + itemId, 800)) return;
+  const L = dayLog(kid, state.today); if (L[itemId]) return;
+  L[itemId] = { st:'pending', n:itemAt(it, state.today).stars };
+  state.pendingAt[`${kid}-${state.today}-${itemId}`] = 'à l’instant';
+  render();
+}
+
+/* ---------- STAR-39 : code parent ---------- */
+SCREENS.pin = () => {
+  const locked = state.lockUntil > Date.now();
+  const rem = Math.ceil((state.lockUntil - Date.now()) / 1000), mm = Math.floor(rem / 60), ss = String(rem % 60).padStart(2, '0');
+  return `
+  <div class="absolute inset-0 bg-primary-900 text-white">
+    <div class="h-full flex flex-col items-center px-8 pt-14 pb-10">
+      <div class="self-start">${backBtn("go('home')", true)}</div>
+      <h2 class="font-display text-2xl mt-6">Espace parent</h2>
+      ${locked
+        ? `<p class="text-rose-200 text-sm mt-4 text-center font-bold">Trop d’essais. Accès bloqué pendant 5 minutes.</p><p id="lockTimer" class="font-display text-6xl mt-10">${mm}:${ss}</p><div class="flex-1"></div>`
+        : `<p class="text-primary-100 text-sm mt-2">Entrez votre code à 4 chiffres</p>
+      <div class="mt-8">${pinDots(state.pin.length, state.pinError)}</div>
+      <p class="h-5 mt-4 text-sm font-bold text-rose-300">${state.pinError}</p>
+      <div class="mt-auto">${keypad('pinPress')}</div>`}
+      <button onclick="state.forgotErr=false;go('forgot')" class="mt-6 h-11 text-sm font-bold text-primary-100 underline underline-offset-4">Code oublié ?</button>
+    </div>
+  </div>`;
+};
+function pinPress(n) {
+  if (state.lockUntil > Date.now()) return;
+  if (n === 'del') { state.pin = state.pin.slice(0, -1); render(); return; }
+  if (state.pin.length >= 4) return;
+  state.pin += n; state.pinError = ''; render();
+  if (state.pin.length < 4) return;
+  setTimeout(() => {
+    if (state.pin === state.parentCode) {
+      state.pin = ''; state.pinFails = 0; state.unlocked = true; state.lastAct = Date.now();
+      go(state.pinTarget, state.pinTargetOpts);
+    } else {
+      state.pin = ''; state.pinFails++;
+      if (state.pinFails >= 5) { state.lockUntil = Date.now() + LOCKOUT_MS; state.pinFails = 0; state.pinError = ''; }
+      else state.pinError = `Code incorrect · ${5 - state.pinFails} essai${5 - state.pinFails > 1 ? 's' : ''} restant${5 - state.pinFails > 1 ? 's' : ''}`;
+      render();
+    }
+  }, 200);
+}
+
+/* ---------- STAR-33 : DEMANDES (action unique : valider) ---------- */
+SCREENS.parent = () => {
+  const pend = pendingList();
+  return `
+  <div class="absolute inset-0 bg-creme flex flex-col">
+    <div class="px-6 pt-14 pb-5 bg-white flex items-center gap-4">
+      <div class="flex-1"><p class="text-xs font-bold text-slate-500">${fullDate(state.today)}</p>
+        <h2 class="font-display text-2xl font-semibold text-ink flex items-center gap-3">Demandes
+        <span id="pendingBadge" class="min-w-[28px] h-[28px] px-2 rounded-full text-sm font-black flex items-center justify-center ${pend.length ? 'bg-accent-400 text-ink' : 'bg-slate-100 text-slate-400'}" aria-label="${pend.length} demandes en attente">${pend.length}</span></h2></div>
+      <button onclick="go('home')" class="tap w-11 h-11 rounded-full bg-slate-100 text-ink flex items-center justify-center" aria-label="Verrouiller · mode enfant"><i data-lucide="lock" class="w-5 h-5"></i></button>
+    </div>
+    <div class="scroll flex-1 overflow-y-auto no-scrollbar px-6 pt-6 pb-32">
+      ${pend.length ? `<p class="text-slate-600 mb-6">Vos enfants ont dit « J’ai fini ! ». Validez pour leur donner l’étoile.</p><div class="space-y-4">${pend.map(p => { const k = getKid(p.kid), it = getItem(p.id), e = entry(p.kid, p.day, p.id); return `
+        <div class="fade-up bg-white rounded-3xl p-5">
+          <div class="flex items-center gap-4">
+            <span class="text-4xl">${it.emoji}</span>
+            <div class="flex-1 min-w-0"><p class="font-extrabold text-ink leading-tight">${itemAt(it, p.day).name}</p>
+              <p class="text-sm text-slate-500 font-semibold mt-1 flex items-center gap-2">${avatarBubble(k, 'w-6 h-6 text-sm')} ${k.name} · ${state.pendingAt[`${p.kid}-${p.day}-${p.id}`] || DAYS_LONG[p.day]}</p></div>
+          </div>
+          <div class="grid grid-cols-[1fr_2fr] gap-3 mt-5">
+            <button onclick="notYet('${p.kid}',${p.day},'${p.id}')" class="tap h-12 rounded-2xl bg-slate-100 text-slate-600 text-sm font-extrabold">Pas encore</button>
+            <button onclick="validate('${p.kid}',${p.day},'${p.id}')" class="tap h-12 rounded-2xl bg-accent-400 text-ink font-extrabold flex items-center justify-center gap-2" aria-label="Valider"><i data-lucide="check" class="w-5 h-5"></i>Valider · +${e.n} ⭐</button>
+          </div>
+        </div>`; }).join('')}</div>`
+      : `<div class="flex flex-col items-center text-center pt-20"><div class="w-28 h-28 rounded-full bg-white flex items-center justify-center text-6xl">✅</div><p class="font-display text-2xl text-ink mt-8">Tout est à jour</p><p class="text-slate-500 mt-2">Aucune demande en attente.</p></div>`}
+    </div>
+    ${tabbar('parent')}
+  </div>`;
+};
+
+/* ---------- STAR-34 : DONNER UNE ÉTOILE EN UN GESTE ---------- */
+SCREENS.give = () => {
+  const gk = getKid(state.giveKid) || state.kids[0];
+  const todayTasks = itemsFor(gk.id, state.today, 'task'), behaviors = itemsFor(gk.id, state.today, 'behavior');
+  const row = (it, kind) => {
+    const st = kind === 'task' ? entry(gk.id, state.today, it.id)?.st : null;
+    const n = kind === 'behavior' ? behaviorCount(gk.id, it.id, state.today) : 0;
+    const btn = st === 'done'
+      ? `<div class="w-16 h-16 rounded-2xl bg-slate-100 text-slate-500 flex flex-col items-center justify-center shrink-0" aria-label="Déjà fait aujourd’hui"><i data-lucide="check" class="w-6 h-6"></i><span class="text-[10px] font-black">Fait</span></div>`
+      : `<button id="give-${it.id}" onclick="${kind === 'task' ? `giveTask('${it.id}')` : `giveBehavior('${it.id}')`}" class="tap w-16 h-16 rounded-2xl bg-accent-400 text-ink flex flex-col items-center justify-center shrink-0" aria-label="Donner ${it.stars} étoile(s)"><span class="text-lg font-black leading-none">+${it.stars}</span><span class="text-lg leading-none">⭐</span></button>`;
+    return `<div class="bg-white rounded-3xl p-3 pl-5 flex items-center gap-4">
+      <span class="text-3xl">${it.emoji}</span>
+      <div class="flex-1 min-w-0"><p class="font-extrabold text-ink leading-tight">${it.name}</p>
+      <p class="text-xs font-semibold text-slate-500 mt-1">${kind === 'task' ? (st === 'done' ? 'Déjà validée aujourd’hui' : st === 'pending' ? 'Demande en attente' : 'À faire aujourd’hui') : (n ? `Donnée ${n}× aujourd’hui` : 'Plusieurs fois par jour')}</p></div>
+      ${btn}</div>`;
+  };
+  return `
+  <div class="absolute inset-0 bg-creme flex flex-col">
+    ${parentHeader('Donner une étoile', 'Pour un geste remarqué', '', true)}
+    <div class="scroll flex-1 overflow-y-auto no-scrollbar px-6 pt-6 pb-32 space-y-8">
+      <div class="flex gap-3 flex-wrap">${state.kids.map(k => chip(k.id === gk.id, `state.giveKid='${k.id}';render()`, `${k.avatar} ${k.name}`)).join('')}</div>
+      <section><p class="text-sm font-extrabold text-slate-500 mb-4">💛 Bons comportements</p>
+        <div class="space-y-4">${behaviors.map(b => row(b, 'behavior')).join('') || '<p class="text-slate-500">Aucun bon comportement défini.</p>'}</div></section>
+      <section><p class="text-sm font-extrabold text-slate-500 mb-4">🗓️ Tâches d’aujourd’hui</p>
+        <div class="space-y-4">${todayTasks.map(t => row(t, 'task')).join('') || '<p class="text-slate-500">Aucune tâche aujourd’hui.</p>'}</div></section>
+    </div>
+    ${tabbar('give')}
+  </div>`;
+};
+
+/* ---------- STAR-19 / 31 : ENFANTS (profils, compteur à vie, objectif) ---------- */
+SCREENS.kids = () => `
+  <div class="absolute inset-0 bg-creme flex flex-col">
+    ${parentHeader('Mes enfants', `${state.kids.length} profil${state.kids.length > 1 ? 's' : ''}`, '', true)}
+    <div class="scroll flex-1 overflow-y-auto no-scrollbar px-6 pt-6 pb-48 space-y-5">
+      ${state.kids.map(k => { const t = weekStars(k.id), g = goalOf(k); return `
+      <div class="bg-white rounded-3xl p-5">
+        <div class="flex items-center gap-4">${avatarBubble(k, 'w-14 h-14 text-3xl')}
+          <div class="flex-1 min-w-0"><p class="font-display text-xl text-ink leading-none">${k.name}</p><p class="text-xs font-bold text-slate-500 mt-1.5">${EXPERIENCES[k.exp].label} · ⭐ ${lifetime(k)} à vie</p></div>
+        </div>
+        <div class="mt-5 h-2.5 rounded-full bg-slate-100 overflow-hidden"><div class="h-full rounded-full bg-primary-500" style="width:${Math.min(100, t / g * 100)}%"></div></div>
+        <div class="mt-4 flex items-center gap-3">
+          <p class="flex-1 text-sm font-bold text-slate-600">${t} / ${g} cette semaine<br><span class="text-xs text-slate-400">${k.goalOverride != null ? `Objectif ajusté · <button class="underline text-primary-600" onclick="resetGoal('${k.id}')">auto (${autoGoal(k.id)})</button>` : `Objectif auto · 80 % de ${possibleStars(k.id)}`}</span></p>
+          <button onclick="adjustGoal('${k.id}',-1)" class="tap w-11 h-11 rounded-full bg-slate-100 font-black text-lg" aria-label="Diminuer l’objectif">−</button>
+          <button onclick="adjustGoal('${k.id}',1)" class="tap w-11 h-11 rounded-full bg-slate-100 font-black text-lg" aria-label="Augmenter l’objectif">+</button>
+        </div>
+      </div>`; }).join('')}
+    </div>
+    <div class="absolute bottom-[92px] inset-x-0 px-6 pb-4 bg-creme">${primaryBtn("go('create')", '+ Ajouter un enfant')}</div>
+    ${tabbar('kids')}
+  </div>`;
+
+function grant(kid, emoji, n) { const k = getKid(kid); k.unseen.push({ emoji, n }); return checkGoal(kid); }
+function afterGrant(k, won, n) {
+  toast(won ? `🏆 ${k.name} a complété sa constellation !` : `⭐ +${n} pour ${k.name} — célébration à son retour`);
+  render();
+}
+function validate(kid, day, id) {
+  const e = entry(kid, day, id); if (!e || e.st !== 'pending' || !tapOk('val' + kid + day + id, 800)) return;
+  e.st = 'done'; delete state.pendingAt[`${kid}-${day}-${id}`];
+  afterGrant(getKid(kid), grant(kid, getItem(id).emoji, e.n), e.n);
+}
+function notYet(kid, day, id) {
+  delete dayLog(kid, day)[id]; delete state.pendingAt[`${kid}-${day}-${id}`];
+  toast(`↩️ De nouveau « à faire » pour ${getKid(kid).name}`); render();
+}
+function giveTask(id) {
+  const k = getKid(state.giveKid), it = itemAt(getItem(id), state.today);
+  if (!tapOk('give' + k.id + id, 900)) return;
+  const L = dayLog(k.id, state.today);
+  if (L[id] && L[id].st === 'done') return; // STAR-34 : une seule fois par jour
+  L[id] = { st:'done', n:it.stars }; delete state.pendingAt[`${k.id}-${state.today}-${id}`];
+  afterGrant(k, grant(k.id, it.emoji, it.stars), it.stars);
+}
+function giveBehavior(id) {
+  const k = getKid(state.giveKid), it = getItem(id);
+  if (!tapOk('give' + k.id + id, 900)) return;
+  dayBonus(k.id, state.today).push({ id, n:it.stars });
+  afterGrant(k, grant(k.id, it.emoji, it.stars), it.stars);
+  $('give-' + id)?.classList.add('pop');
+}
+function adjustGoal(kid, d) { const k = getKid(kid); k.goalOverride = Math.max(1, goalOf(k) + d); checkGoal(kid); render(); }
+function resetGoal(kid) { getKid(kid).goalOverride = null; checkGoal(kid); render(); }
+
+/* ---------- STAR-25 / 26 / 27 : HORAIRE ---------- */
+SCREENS.tasks = () => {
+  const f = state.taskFilter, tab = state.taskTab, tomorrow = state.today + 1;
+  const list = state.items.filter(i => !i.deleted && i.type === tab).map(i => ({ raw:i, v:itemAt(i, tomorrow) })).filter(({ v }) => f === 'all' || v.kids.includes(f));
+  const card = ({ raw, v }) => `
+    <button onclick="editItem('${raw.id}')" data-item="${raw.id}" class="tap w-full text-left bg-white rounded-3xl p-4 flex items-center gap-4 ${raw.active ? '' : 'opacity-50'}">
+      <span class="text-3xl w-10 text-center">${v.emoji}</span>
+      <div class="flex-1 min-w-0">
+        <p class="font-extrabold text-ink leading-tight">${v.name}</p>
+        <p class="text-xs font-bold text-slate-500 mt-1.5">${v.kids.map(id => getKid(id)?.avatar || '').join(' ')} · ${tab === 'task' ? daysLabel(v.days) : 'En tout temps'}${raw.active ? '' : ' · En pause'}${raw.next ? ' · modifiée dès demain' : ''}</p>
+      </div>
+      <span class="text-sm font-extrabold text-accent-700 shrink-0">${'⭐'.repeat(v.stars)}</span>
+    </button>`;
+  const body = tab === 'task'
+    ? MOMENTS.map(([m, e, l]) => { const g = list.filter(x => x.v.moment === m); return g.length ? `<section><p class="text-sm font-extrabold text-slate-500 mb-4">${e} ${l}</p><div class="space-y-3">${g.map(card).join('')}</div></section>` : ''; }).join('')
+    : `<div class="space-y-3">${list.map(card).join('')}</div>`;
+  return `
+  <div class="absolute inset-0 bg-creme flex flex-col">
+    <div class="px-6 pt-14 pb-5 bg-white">
+      <div class="flex items-center gap-4"><h2 class="flex-1 font-display text-2xl font-semibold text-ink">Horaire</h2>
+        <button onclick="go('home')" class="tap w-11 h-11 rounded-full bg-slate-100 text-ink flex items-center justify-center" aria-label="Verrouiller · mode enfant"><i data-lucide="lock" class="w-5 h-5"></i></button></div>
+      <div class="mt-5 p-1 rounded-2xl bg-slate-100 grid grid-cols-2">
+        <button onclick="state.taskTab='task';render()" class="h-11 rounded-xl text-sm font-extrabold ${tab === 'task' ? 'bg-white text-ink' : 'text-slate-500'}">Tâches</button>
+        <button onclick="state.taskTab='behavior';render()" class="h-11 rounded-xl text-sm font-extrabold ${tab === 'behavior' ? 'bg-white text-ink' : 'text-slate-500'}">Bons comportements</button>
+      </div>
+      <div class="flex gap-3 mt-4 overflow-x-auto no-scrollbar">
+        ${chip(f === 'all', "state.taskFilter='all';render()", 'Tous', 'shrink-0')}
+        ${state.kids.map(k => chip(f === k.id, `state.taskFilter='${k.id}';render()`, `${k.avatar} ${k.name}`, 'shrink-0')).join('')}
+      </div>
+    </div>
+    <div class="scroll flex-1 overflow-y-auto no-scrollbar px-6 pt-6 pb-48 space-y-8">
+      <p class="text-sm text-slate-500 flex gap-2"><i data-lucide="repeat" class="w-4 h-4 shrink-0 mt-0.5"></i>${tab === 'task' ? 'Reviennent chaque lundi. Touchez une tâche pour la modifier, la mettre en pause ou la supprimer.' : 'Sans jour ni moment : à récompenser quand vous les voyez.'}</p>
+      ${list.length ? body : `<div class="text-center py-12 text-slate-400 font-bold">Rien ici pour l’instant</div>`}
+    </div>
+    <button onclick="go('form')" class="tap absolute right-6 bottom-[108px] z-20 h-14 pl-5 pr-6 rounded-full bg-primary-600 text-white font-extrabold flex items-center gap-2 shadow-lg"><i data-lucide="plus" class="w-5 h-5"></i>Ajouter</button>
+    ${tabbar('tasks')}
+  </div>`;
+};
+function daysLabel(d) {
+  if (d.length === 7) return 'Tous les jours';
+  if (d.length === 5 && WEEKDAYS.every(x => d.includes(x))) return 'En semaine';
+  if (d.length === 2 && d.includes(5) && d.includes(6)) return 'Fin de semaine';
+  return d.map(i => DAYS[i]).join(' ');
+}
+function toggleItem(id) {
+  const it = getItem(id); it.active = !it.active;
+  state.kids.forEach(k => checkGoal(k.id));
+  toast(it.active ? `▶️ « ${it.name} » réactivée` : `⏸ « ${it.name} » en pause · objectif recalculé`);
+  render();
+}
+function deleteItem(id) {
+  const it = getItem(id); if (!it) return;
+  it.deleted = true;
+  if (state.screen === 'form') go('tasks'); else render();
+  toast(`🗑️ Supprimée · les étoiles gagnées sont conservées`, 'Annuler', () => { it.deleted = false; render(); });
+}
+function editItem(id) {
+  const it = getItem(id), v = itemAt(it, state.today + 1);
+  state.form = { id, step:'details', type:it.type, name:v.name, emoji:v.emoji, kids:v.kids.slice(), moment:v.moment || 'matin', days:(v.days || []).slice(), stars:v.stars, libCat: it.type === 'task' ? 'matin' : 'savoir' };
+  state.formErr = {};
+  go('form', { keepForm:true });
+}
+
+/* ---------- STAR-22 / 24 / 25 / 26 : AJOUT (1. bibliothèque → 2. détails) / MODIFICATION ---------- */
+function newForm() {
+  const kids = state.taskFilter === 'all' ? state.kids.map(k => k.id) : [state.taskFilter];
+  const type = state.taskTab;
+  return { id:null, step:'lib', type, name:'', emoji: type === 'task' ? '⭐' : '🤝', kids, moment:'matin', days:WEEKDAYS.slice(), stars:1, libCat: type === 'task' ? 'matin' : 'savoir' };
+}
+function currentLibItems() {
+  const f = state.form, suggest = f.kids.some(id => isSimple(getKid(id)));
+  const l = f.libCat === 'famille' ? state.familyLib.filter(x => x.type === f.type) : LIBRARY.filter(x => x.cat === f.libCat);
+  return suggest ? [...l.filter(x => x.simple), ...l.filter(x => !x.simple)] : l;
+}
+SCREENS.form = () => {
+  const f = state.form, isTask = f.type === 'task', er = state.formErr || {};
+  if (f.step === 'lib') {
+    const cats = [...CATS.filter(c => c.type === f.type), ...(state.familyLib.some(l => l.type === f.type) ? [{ id:'famille', icon:'🏡', label:'Notre famille' }] : [])];
+    if (!cats.find(c => c.id === f.libCat)) f.libCat = cats[0].id;
+    const suggest = f.kids.some(id => isSimple(getKid(id)));
+    return `
+    <div class="absolute inset-0 bg-creme flex flex-col">
+      ${parentHeader('Bibliothèque', 'Choisir un défi illustré', "go('tasks')")}
+      <div class="px-6 pt-5 pb-4 bg-creme space-y-4">
+        <div class="p-1 rounded-2xl bg-slate-100 grid grid-cols-2">
+          <button onclick="setForm('type','task')" class="h-11 rounded-xl text-sm font-extrabold ${isTask ? 'bg-white text-ink' : 'text-slate-500'}">Tâches</button>
+          <button onclick="setForm('type','behavior')" class="h-11 rounded-xl text-sm font-extrabold ${!isTask ? 'bg-white text-ink' : 'text-slate-500'}">Bons comportements</button>
+        </div>
+        <div class="flex gap-3 overflow-x-auto no-scrollbar">${cats.map(c => chip(f.libCat === c.id, `state.form.libCat='${c.id}';render()`, `${c.icon} ${c.label}`, 'shrink-0')).join('')}</div>
+      </div>
+      <div class="scroll flex-1 overflow-y-auto no-scrollbar px-6 pt-2 pb-36">
+        ${suggest ? '<p class="text-xs font-bold text-primary-700 mb-4">🧸 Les plus simples d’abord (expérience simplifiée)</p>' : ''}
+        <div class="grid grid-cols-2 gap-4">
+          ${currentLibItems().map((l, i) => `<button onclick="pickLib(${i})" class="tap lib-item text-left bg-white rounded-3xl p-4 flex flex-col gap-3">
+            <div class="flex items-start justify-between"><span class="text-4xl">${l.emoji}</span><span class="text-xs font-extrabold text-accent-700">${'⭐'.repeat(l.stars)}</span></div>
+            <p class="text-sm font-extrabold text-ink leading-tight">${l.name}</p>
+            ${suggest && l.simple ? '<span class="self-start px-2 py-0.5 rounded-md bg-primary-50 text-primary-700 text-[10px] font-black">Suggéré</span>' : ''}
+          </button>`).join('')}
+        </div>
+      </div>
+      ${footer(`<button onclick="state.form.step='details';render(true)" class="tap w-full h-14 rounded-2xl bg-white border-2 border-slate-200 text-ink font-display text-lg">✏️ Créer ${isTask ? 'ma propre tâche' : 'mon propre comportement'}</button>`)}
+    </div>`;
+  }
+  const raw = f.id ? getItem(f.id) : null;
+  return `
+  <div class="absolute inset-0 bg-creme flex flex-col">
+    ${parentHeader(f.id ? 'Modifier' : (isTask ? 'Nouvelle tâche' : 'Nouveau comportement'), f.id ? 'Les changements s’appliquent dès demain' : 'Étape 2 sur 2', f.id ? "go('tasks')" : "state.form.step='lib';render(true)")}
+    <div class="scroll flex-1 overflow-y-auto no-scrollbar px-6 pt-6 pb-36 space-y-8">
+      <div class="flex items-center gap-5">
+        <div class="w-20 h-20 rounded-3xl bg-white flex items-center justify-center text-5xl shrink-0">${f.emoji}</div>
+        <div class="flex-1 min-w-0">
+          <label for="fName" class="block text-sm font-extrabold mb-2">Nom <span class="text-rose-600">*</span></label>
+          <input id="fName" value="${f.name.replace(/"/g, '&quot;')}" maxlength="40" placeholder="${isTask ? 'Ex. : Ranger mes souliers' : 'Ex. : J’ai attendu mon tour'}"
+            oninput="state.form.name=this.value;if(this.value.trim())this.classList.remove('field-error')"
+            class="w-full h-14 px-4 rounded-2xl bg-white border-2 border-slate-200 focus:border-primary-500 outline-none font-bold ${er.name ? 'field-error' : ''}">
+        </div>
+      </div>
+      ${errMsg(er.name, 'Donnez un nom pour l’enregistrer.')}
+      <div>${label('Illustration')}
+        <div class="grid grid-cols-6 gap-3">${ICONS.map(e => `<button onclick="setForm('emoji','${e}')" class="tap aspect-square rounded-2xl text-2xl flex items-center justify-center ${e === f.emoji ? 'bg-primary-100 ring-2 ring-primary-500' : 'bg-white'}">${e}</button>`).join('')}</div>
+      </div>
+      <div>${label('Pour qui ?')}
+        <div class="flex flex-wrap gap-3">${state.kids.map(k => chip(f.kids.includes(k.id), `toggleFormKid('${k.id}')`, `${k.avatar} ${k.name}`)).join('')}</div>
+        ${errMsg(er.kids, 'Choisissez au moins un enfant.')}
+      </div>
+      ${isTask ? `
+      <div>${label('Moment')}
+        <div class="grid grid-cols-3 gap-3">${MOMENTS.map(([m, e, l]) => chip(f.moment === m, `setForm('moment','${m}')`, `${e} ${l}`, 'px-2 text-xs')).join('')}</div>
+      </div>
+      <div>${label('Jours', true)}
+        <div class="grid grid-cols-7 gap-1.5 ${er.days ? 'p-1 rounded-2xl ring-2 ring-rose-500' : ''}">${DAYS.map((d, i) => `<button onclick="toggleFormDay(${i})" class="tap h-12 rounded-xl text-xs font-extrabold ${f.days.includes(i) ? 'bg-primary-600 text-white' : 'bg-white text-slate-500'}">${d}</button>`).join('')}</div>
+        ${errMsg(er.days, 'Choisissez au moins un jour pour planifier cette tâche.')}
+        <p class="text-xs text-slate-500 mt-3">🔁 Revient chaque semaine${f.kids.length > 1 ? ' · suivie séparément pour chaque enfant' : ''}</p>
+      </div>` : ''}
+      <div>${label('Valeur')}
+        <div class="grid grid-cols-3 gap-3">${[1,2,3].map(n => `<button onclick="setForm('stars',${n})" class="tap h-16 rounded-2xl font-extrabold ${f.stars === n ? 'bg-accent-100 ring-2 ring-accent-500 text-ink' : 'bg-white text-slate-500'}">${'⭐'.repeat(n)}</button>`).join('')}</div>
+      </div>
+      ${raw ? `<div class="grid grid-cols-2 gap-3 pt-2">
+        <button onclick="toggleItem('${raw.id}')" class="tap h-12 rounded-2xl bg-white text-ink font-extrabold flex items-center justify-center gap-2"><i data-lucide="${raw.active ? 'pause' : 'play'}" class="w-4 h-4"></i>${raw.active ? 'Mettre en pause' : 'Réactiver'}</button>
+        <button onclick="deleteItem('${raw.id}')" class="tap h-12 rounded-2xl bg-white text-rose-600 font-extrabold flex items-center justify-center gap-2"><i data-lucide="trash-2" class="w-4 h-4"></i>Supprimer</button>
+      </div>` : ''}
+    </div>
+    ${footer(primaryBtn('saveForm()', f.id ? 'Enregistrer' : (isTask ? 'Planifier' : 'Ajouter')))}
+  </div>`;
+};
+function setForm(k, v) {
+  state.form[k] = v;
+  if (k === 'type') { state.form.name = ''; state.form.emoji = v === 'task' ? '⭐' : '🤝'; state.form.libCat = v === 'task' ? 'matin' : 'savoir'; state.formErr = {}; }
+  if (k === 'days' && v.length) state.formErr.days = false;
+  render();
+}
+function pickLib(i) {
+  const l = currentLibItems()[i]; if (!l) return;
+  Object.assign(state.form, { name:l.name, emoji:l.emoji, stars:l.stars, step:'details' });
+  if (l.moment) state.form.moment = l.moment;
+  state.formErr.name = false; render(true);
+}
+function toggleFormKid(id) { const k = state.form.kids; state.form.kids = k.includes(id) ? k.filter(x => x !== id) : [...k, id]; if (state.form.kids.length) state.formErr.kids = false; render(); }
+function toggleFormDay(i) { const d = state.form.days; state.form.days = d.includes(i) ? d.filter(x => x !== i) : [...d, i].sort(); if (state.form.days.length) state.formErr.days = false; render(); }
+function saveForm() {
+  const f = state.form; f.name = f.name.trim();
+  state.formErr = { name: !f.name, kids: !f.kids.length, days: f.type === 'task' && !f.days.length };
+  if (state.formErr.name || state.formErr.kids || state.formErr.days) { f.step = 'details'; render(); toast(state.formErr.days && !state.formErr.name ? '🗓️ Planification refusée : choisissez au moins un jour' : '✏️ Complétez le champ signalé'); return; }
+  const data = { name:f.name, emoji:f.emoji, kids:f.kids.slice(), stars:f.stars, ...(f.type === 'task' ? { moment:f.moment, days:f.days.slice() } : {}) };
+  if (f.id) {
+    const it = getItem(f.id); it.next = data; it.nextFrom = state.today + 1;
+    state.taskTab = f.type; go('tasks'); toast(`✅ Mise à jour · s’applique dès demain`); return;
+  }
+  state.items.push({ id:uid(f.type === 'task' ? 't' : 'b'), type:f.type, active:true, ...data });
+  const inLib = [...LIBRARY, ...state.familyLib].some(l => l.name === f.name);
+  if (!inLib) state.familyLib.push({ cat:'famille', emoji:f.emoji, name:f.name, stars:f.stars, simple:true, type:f.type, moment: f.type === 'task' ? f.moment : null });
+  state.kids.forEach(k => checkGoal(k.id));
+  state.taskTab = f.type; go('tasks');
+  toast(`✨ Planifiée pour ${namesList(f.kids)}${inLib ? '' : ' · ajoutée à « Notre famille »'}`);
+}
+
+/* =========================================================
+   OVERLAYS : CÉLÉBRATION (STAR-30), CONSTELLATION COMPLÈTE (STAR-31), NOUVELLE SEMAINE
+   ========================================================= */
+let overlayTimer, overlayClosing = false, overlayOnClose = null;
+function confetti(n = 20) { let s = ''; for (let i = 0; i < n; i++) s += `<span class="confetti" style="left:${Math.random() * 100}%;font-size:${14 + Math.random() * 14}px;animation-duration:${1.6 + Math.random() * 1.2}s;animation-delay:${Math.random() * .4}s">⭐</span>`; return s; }
+function openOverlay(html, onClose, autoMs) {
+  const o = $('overlay'); clearTimeout(overlayTimer);
+  overlayClosing = false; overlayOnClose = onClose; o.innerHTML = html; o.classList.remove('hidden');
+  if (window.lucide) lucide.createIcons();
+  if (autoMs) overlayTimer = setTimeout(closeOverlay, autoMs);
+}
+function closeOverlay() {
+  if (overlayClosing || !overlayOpen()) return; overlayClosing = true; clearTimeout(overlayTimer);
+  $('overlay').classList.add('hidden'); $('overlay').innerHTML = '';
+  const cb = overlayOnClose; overlayOnClose = null; if (cb) cb();
+}
+const overlayOpen = () => !$('overlay').classList.contains('hidden');
+
+/* Plusieurs étoiles reçues en son absence → une seule animation, ≤ 3 s, interruptible */
+function celebrateReceived(k) {
+  const n = unseenSum(k), emojis = k.unseen.map(u => u.emoji).slice(0, 5).join(' '), simple = isSimple(k);
+  const msgs = ['Tu brilles comme une étoile !', 'Bravo, continue comme ça !', 'Quelle belle étoile !', 'Je suis fier de toi !'];
+  const msg = msgs[(weekStars(k.id) + n) % msgs.length];
+  state.celebrating = k.id;
+  openOverlay(`
+    <div onclick="closeOverlay()" class="absolute inset-0 bg-primary-900/95 flex flex-col items-center justify-center text-white px-8 text-center overflow-hidden cursor-pointer" role="dialog" aria-label="Bravo ${k.name}, +${n} étoiles">
+      ${confetti()}
+      <div class="pop">${mascot(simple ? 170 : 130)}</div>
+      ${simple ? '' : `<p class="font-display text-4xl mt-6 pop">Bravo ${k.name} !</p><p class="kid-txt text-primary-100 mt-3">${msg}</p>`}
+      <p class="text-4xl mt-6">${emojis}</p>
+      <div class="mt-6 fly-up flex flex-wrap justify-center gap-1 max-w-[240px]">${Array.from({ length: Math.min(n, 10) }, () => '<span class="text-5xl">⭐</span>').join('')}</div>
+    </div>`, () => {
+      const total = weekStars(k.id), before = Math.max(0, total - n), g = goalOf(k);
+      k.unseen = []; state.celebrating = null;
+      state.justLit = { kid:k.id, from:Math.min(before, g), to:Math.min(total, g) };
+      render(); setTimeout(() => { state.justLit = null; }, 50);
+    }, 2900);
+}
+function rewardOverlay(k) {
+  const simple = isSimple(k); k.rewardSeen = true;
+  openOverlay(`
+    <div class="absolute inset-0 bg-primary-900 flex flex-col items-center justify-center text-white px-8 text-center overflow-hidden">
+      ${confetti(30)}
+      <div class="pop text-8xl">${k.reward ? k.reward.emoji : '🌌'}</div>
+      ${simple ? '' : `<p class="font-display text-3xl leading-tight mt-8">Constellation complète !</p><p class="kid-txt text-primary-100 mt-3">${k.reward ? `Tu as gagné : ${k.reward.label}` : 'Elle brille dans « Mon ciel »'}</p>`}
+      <button onclick="closeOverlay()" class="tap mt-12 w-[76px] h-[76px] rounded-full bg-accent-400 text-ink flex items-center justify-center" aria-label="Super !"><i data-lucide="check" class="w-10 h-10" stroke-width="3.5"></i></button>
+      <p class="sr-only">Ta constellation rejoint Mon ciel.</p>
+    </div>`, () => render());
+}
+/* STAR-31 : message bienveillant au début d'une nouvelle semaine, sans mention d'échec */
+function weekMsgOverlay(k) {
+  const simple = isSimple(k), type = k.weekMsg; k.weekMsg = null;
+  const txt = type === 'first' ? 'Ta première galaxie t’attend !' : type === 'bravo' ? 'Ta constellation brille dans « Mon ciel ». C’est reparti !' : 'Une nouvelle semaine commence, avec plein d’étoiles à allumer !';
+  openOverlay(`
+    <div onclick="closeOverlay()" class="absolute inset-0 bg-primary-900 flex flex-col items-center justify-center text-white px-10 text-center cursor-pointer">
+      <div class="floaty">${mascot(150)}</div>
+      ${simple ? '<p class="text-5xl mt-8">🚀</p>' : `<p class="kid-txt mt-8 leading-snug">${txt}</p>`}
+    </div>`, () => render(), 3000);
+}
+function maybeOverlay() {
+  if (state.screen !== 'week' || overlayOpen()) return;
+  const k = getKid(state.currentKid); if (!k) return;
+  setTimeout(() => {
+    if (state.screen !== 'week' || overlayOpen() || state.currentKid !== k.id) return;
+    if (k.unseen.length) celebrateReceived(k);
+    else if (k.rewardWon && !k.rewardSeen) rewardOverlay(k);
+    else if (k.weekMsg) weekMsgOverlay(k);
+  }, 350);
+}
+
+/* =========================================================
+   TOAST
+   ========================================================= */
+let toastTimer, toastAction;
+function toast(msg, actionLabel, actionFn) {
+  const t = $('toast'); clearTimeout(toastTimer); toastAction = actionFn;
+  t.innerHTML = `<div class="fade-up flex items-center gap-3 px-5 py-4 rounded-2xl bg-ink text-white text-sm font-bold shadow-xl">
+    <span class="flex-1">${msg}</span>${actionLabel ? `<button onclick="toastAction&&toastAction();$('toast').classList.add('hidden')" class="text-accent-400 font-extrabold">${actionLabel}</button>` : ''}</div>`;
+  t.style.bottom = ['parent','tasks','give','kids'].includes(state.screen) ? '104px' : '120px';
+  t.classList.remove('hidden');
+  toastTimer = setTimeout(() => t.classList.add('hidden'), 3400);
+}
+
+/* =========================================================
+   NAVIGATION & VERROUILLAGE (STAR-39)
+   ========================================================= */
+const PARENT = ['parent','give','kids','tasks','form','create','routine'];
+const CHILD = ['home','week'];
+const DARK = ['welcome','intro','week','pin','setcode','forgot'];
+function go(screen, opts = {}) {
+  if (PARENT.includes(screen) && !state.unlocked && !(state.onboarding && ['create','routine'].includes(screen))) {
+    state.pinTarget = screen; state.pinTargetOpts = opts; state.pin = ''; state.pinError = ''; screen = 'pin';
+  }
+  if (CHILD.includes(screen)) {
+    if (state.unlocked) { state.unlocked = false; setTimeout(() => toast('🔒 Espace parent verrouillé'), 50); }
+    state.onboarding = false;
+  }
+  if (opts.kid) { state.currentKid = opts.kid; state.viewDay = state.today; state.weekView = 'day'; }
+  if (screen === 'form' && !opts.keepForm) { state.form = newForm(); state.formErr = {}; }
+  if (screen === 'create') { state.draft = newDraft(); state.draftErr = {}; }
+  if (screen === 'account') { state.accountErr = false; }
+  if (screen !== 'home') state.highlightKid = null;
+  closeOverlay();
+  state.screen = screen;
+  render(true);
+}
+function render(fresh) {
+  const host = $('screens');
+  const prev = host.querySelector('.scroll');
+  const top = !fresh && prev ? prev.scrollTop : 0;
+  host.innerHTML = `<section class="absolute inset-0" data-screen="${state.screen}">${SCREENS[state.screen]()}</section>`;
+  const sc = host.querySelector('.scroll'); if (sc) sc.scrollTop = top;
+  bindSwipe();
+  const dark = DARK.includes(state.screen);
+  $('statusbar').classList.toggle('text-white', dark); $('statusbar').classList.toggle('text-ink', !dark);
+  $('homeIndicator').classList.toggle('bg-white', dark); $('homeIndicator').classList.toggle('bg-ink', !dark);
+  renderPanel();
+  if (window.lucide) lucide.createIcons();
+  if (state.screen === 'week') maybeOverlay();
+}
+/* Glissement court pour changer de jour (STAR-32) ou d'écran de présentation */
+function bindSwipe() {
+  const el = $('daySwipe') || $('introSwipe'); if (!el) return;
+  let x0 = null;
+  el.addEventListener('pointerdown', e => { x0 = e.clientX; });
+  el.addEventListener('pointerup', e => {
+    if (x0 == null) return; const dx = e.clientX - x0; x0 = null;
+    if (Math.abs(dx) < 60) return;
+    if (state.screen === 'intro') { const n = state.introIdx + (dx < 0 ? 1 : -1); if (n >= 0 && n < INTRO.length) { state.introIdx = n; render(); } }
+    else if (state.weekView === 'day' && !isSimple(getKid(state.currentKid))) setDay(state.viewDay + (dx < 0 ? 1 : -1));
+  });
+}
+/* Verrouillage auto après 2 min d'inactivité + minuteur de blocage */
+$('phone').addEventListener('pointerdown', () => { state.lastAct = Date.now(); }, true);
+$('phone').addEventListener('keydown', () => { state.lastAct = Date.now(); }, true);
+setInterval(() => {
+  if (state.unlocked && Date.now() - state.lastAct > INACTIVITY_MS) { go('home'); setTimeout(() => toast('🔒 Espace parent verrouillé (2 min d’inactivité)'), 80); }
+  if (state.screen === 'pin' && state.lockUntil) {
+    if (state.lockUntil <= Date.now()) { state.lockUntil = 0; render(); }
+    else if ($('lockTimer')) { const r = Math.ceil((state.lockUntil - Date.now()) / 1000); $('lockTimer').textContent = Math.floor(r / 60) + ':' + String(r % 60).padStart(2, '0'); }
+  }
+  updateLockStatus();
+}, 1000);
+function updateLockStatus() {
+  const el = $('lockStatus'); if (!el) return;
+  if (state.unlocked) { const r = Math.max(0, Math.ceil((INACTIVITY_MS - (Date.now() - state.lastAct)) / 1000)); el.innerHTML = `<span class="text-white">🔓 Espace parent ouvert</span> <span class="text-slate-400">· verrouillage auto dans ${Math.floor(r / 60)}:${String(r % 60).padStart(2, '0')}</span>`; }
+  else if (state.lockUntil > Date.now()) el.innerHTML = '<span class="text-rose-300">⛔ Accès parent bloqué (5 codes erronés)</span>';
+  else el.innerHTML = '<span class="text-slate-300">🔒 Espace parent verrouillé · l’app s’ouvre en mode enfant</span>';
+}
+
+/* =========================================================
+   PANNEAU PRÉSENTATEUR (2 colonnes compactes)
+   ========================================================= */
+const PANEL = [
+  { epic:'Onboarding', items:[['welcome','Accueil'],['intro','Présentation'],['setcode','Code parent']] },
+  { epic:'Profils enfants', items:[['home','Qui brille ?'],['create','Créer un profil'],['routine','Routine proposée'],['kids','Mes enfants']] },
+  { epic:'Ma semaine', items:[['week-lea','Léa · détaillée'],['week-noah','Noah · simplifiée']] },
+  { epic:'Tâches & comportements', items:[['tasks','Horaire'],['form','Bibliothèque']] },
+  { epic:'Attribution des étoiles', items:[['parent','Demandes'],['give','Donner une étoile'],['pin','Accès parent']] },
+];
+function currentKey() { return state.screen === 'week' ? 'week-' + state.currentKid : state.screen; }
+function panelGo(key) {
+  if (key.startsWith('week-')) { const id = key.slice(5); if (!getKid(id)) return toast('Réinitialisez la démo pour retrouver ce profil'); return go('week', { kid:id }); }
+  if (key === 'setcode') { state.onboarding = true; state.codeMode = 'onboard'; state.codeStep = 1; state.codeEntry = ''; state.codeFirst = ''; state.codeMsg = ''; }
+  if (key === 'intro') state.introIdx = 0;
+  if (key === 'pin') { state.pinTarget = 'parent'; state.pinTargetOpts = {}; state.pin = ''; state.pinError = ''; state.unlocked = false; }
+  if (key === 'routine' && !(state.routineKid && state.routineDraft && getKid(state.routineKid))) { toast('Créez d’abord un profil : la routine est proposée juste après'); return go('create'); }
+  go(key);
+}
+function renderPanel() {
+  const cur = currentKey();
+  const col = groups => groups.map(g => `
+    <div>
+      <p class="text-[10px] uppercase tracking-[.14em] text-slate-400 font-extrabold mb-1.5">${g.epic}</p>
+      <div class="grid gap-1">${g.items.map(([k, l]) => `<button onclick="panelGo('${k}')" class="tap w-full h-8 px-3 rounded-lg text-[13px] font-bold flex items-center justify-between gap-2 ${cur === k ? 'bg-accent-400 text-ink' : 'bg-slate-700/50 hover:bg-slate-700 text-slate-100'}">
+        <span class="truncate">${l}</span></button>`).join('')}</div>
+    </div>`).join('');
+  $('panelNav').innerHTML = `<div class="space-y-3">${col(PANEL.slice(0, 2))}</div><div class="space-y-3">${col(PANEL.slice(2))}</div>`;
+  $('codeHint').innerHTML = `Code parent <b class="text-slate-200">${state.parentCode}</b> · Mot de passe <b class="text-slate-200">${DEMO_PASSWORD}</b>`;
+  updateLockStatus();
+}
+
+/* Relance simulée : écran de démarrage, puis ouverture en mode enfant (STAR-39), données conservées */
+function reopenApp() {
+  closeOverlay(); $('toast').classList.add('hidden');
+  state.unlocked = false; state.onboarding = false; state.pin = ''; state.pinError = ''; state.weekView = 'day';
+  $('screens').innerHTML = `<section class="absolute inset-0 bg-primary-900 flex flex-col items-center justify-center text-white">
+    <div class="pop">${mascot(120)}</div><p class="font-display text-3xl mt-6">Petite Étoile</p></section>`;
+  $('statusbar').classList.add('text-white'); $('statusbar').classList.remove('text-ink');
+  setTimeout(() => go('home'), 900);
+}
+function resetDemo() { closeOverlay(); state = seed(); go('welcome'); toast('🔄 Démo réinitialisée'); }
+
+/* =========================================================
+   MISE À L'ÉCHELLE : téléphone + panneau tiennent toujours dans l'écran
+   ========================================================= */
+function fitLayout() {
+  const wrap = $('phoneWrap'), phone = $('phone'), pw = $('panelWrap'), panel = $('panel');
+  const availH = window.innerHeight - 48, availW = window.innerWidth - 48 - 40;
+  panel.style.transform = ''; pw.style.height = ''; pw.style.width = '';
+  const ph = panel.offsetHeight, pwid = panel.offsetWidth;
+  let s = Math.min(1, availH / 826), ps = Math.min(1, availH / ph);
+  const need = 389 * s + pwid * ps;
+  if (need > availW) { const k = availW / need; s *= k; ps *= k; }   // aucune barre de défilement, même sur un petit écran
+  phone.style.transformOrigin = 'top left'; phone.style.transform = s < 1 ? `scale(${s})` : '';
+  wrap.style.width = 389 * s + 'px'; wrap.style.height = 826 * s + 'px';
+  panel.style.transformOrigin = 'top left'; panel.style.transform = ps < 1 ? `scale(${ps})` : '';
+  pw.style.width = pwid * ps + 'px'; pw.style.height = ph * ps + 'px';
+}
+window.addEventListener('resize', fitLayout);
+go('welcome');
+fitLayout();
+</script>
+</body>
+</html>
